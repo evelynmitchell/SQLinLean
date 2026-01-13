@@ -47,6 +47,8 @@ inductive Operator where
   | Minus          -- -
   | Multiply       -- *
   | Divide         -- /
+  | And            -- AND logical operator
+  | Or             -- OR logical operator
   deriving Repr, BEq, DecidableEq, Nonempty
 
 -- SQL Literal types

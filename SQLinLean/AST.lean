@@ -11,7 +11,7 @@ inductive Expr where
   | Star
   | QualifiedStar (table : String)
   | BinaryOp (left : Expr) (op : Operator) (right : Expr)
-  | UnaryOp (op : Keyword) (expr : Expr)  -- For NOT
+  | Not (expr : Expr)  -- NOT unary operator
   deriving Repr, BEq, Nonempty
 
 -- Column selection in SELECT

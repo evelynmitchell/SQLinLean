@@ -102,7 +102,7 @@ mutual
         match parseAnd s'' with
         | ParserResult.error msg state => ParserResult.error msg state
         | ParserResult.ok right s''' =>
-          ParserResult.ok (.BinaryOp left .Equals right) s'''  -- Simplified: treating AND as binary op
+          ParserResult.ok (.BinaryOp left .And right) s'''
       | _ => ParserResult.ok left s'
 
   -- Parse an OR expression
@@ -116,7 +116,7 @@ mutual
         match parseOr s'' with
         | ParserResult.error msg state => ParserResult.error msg state
         | ParserResult.ok right s''' =>
-          ParserResult.ok (.BinaryOp left .Equals right) s'''  -- Simplified: treating OR as binary op
+          ParserResult.ok (.BinaryOp left .Or right) s'''
       | _ => ParserResult.ok left s'
 end
 
