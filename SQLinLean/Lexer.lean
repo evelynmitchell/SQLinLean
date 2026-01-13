@@ -59,11 +59,30 @@ partial def readWhile (s : LexerState) (pred : Char → Bool) : String × LexerS
     else
       ("", s)
 
--- Simple float parser (since toFloat? doesn't exist in Lean 4)
+-- Parse float from string with decimal point
 def parseFloat (s : String) : Option Float :=
-  match s.toInt? with
-  | some i => some (Float.ofInt i)
-  | none => none  -- Simplified: just handle integers as floats
+  let parts := s.split (· = '.')
+  match parts with
+  | [intPart] =>
+    -- No decimal point: parse as integer and convert to float
+    match intPart.toInt? with
+    | some i => some (Float.ofInt i)
+    | none => none
+  | [intPart, fracPart] =>
+    -- Exactly one decimal point
+    if fracPart.isEmpty then
+      none
+    else
+      match intPart.toInt?, fracPart.toNat? with
+      | some i, some fracNat =>
+        let fracLen := fracPart.length
+        let denom  := Nat.pow 10 fracLen
+        let frac   := (Float.ofNat fracNat) / (Float.ofNat denom)
+        some (Float.ofInt i + frac)
+      | _, _ => none
+  | _ =>
+    -- More than one decimal point: invalid
+    none
 
 -- Tokenize a number
 def tokenizeNumber (s : LexerState) : LexerResult Token :=
@@ -85,12 +104,22 @@ partial def readStringContent (acc : String) (state : LexerState) : LexerResult 
     if c = '\'' then
       .ok (.Literal (.String acc)) (state.advance)
     else if c = '\\' then
-      -- Simple escape handling
+      -- Handle common escape sequences
       let state := state.advance
       match state.peek with
       | none => .error "Unterminated string literal" state
       | some escapeChar =>
-        readStringContent (acc ++ String.ofList [escapeChar]) (state.advance)
+        let escaped :=
+          match escapeChar with
+          | 'n'  => '\n'
+          | 't'  => '\t'
+          | 'r'  => '\r'
+          | '0'  => Char.ofNat 0
+          | '\\' => '\\'
+          | '\'' => '\''
+          | '"'  => '"'
+          | c    => c
+        readStringContent (acc ++ String.ofList [escaped]) (state.advance)
     else
       readStringContent (acc ++ String.ofList [c]) (state.advance)
 

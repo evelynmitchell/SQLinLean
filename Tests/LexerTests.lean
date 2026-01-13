@@ -36,6 +36,18 @@ def testNumbers : IO Unit := do
       | _ => 
           IO.println s!"FAIL: testNumbers - Got {repr tokens}"
 
+-- Test tokenizing float literals
+def testFloats : IO Unit := do
+  match tokenizeString "3.14 2.5" with
+  | LexerResult.error msg _ => 
+      IO.println s!"FAIL: testFloats - {msg}"
+  | LexerResult.ok tokens _ =>
+      match tokens with
+      | [Token.Literal (Literal.Float _), Token.Literal (Literal.Float _), Token.EOF] =>
+          IO.println "PASS: testFloats"
+      | _ => 
+          IO.println s!"FAIL: testFloats - Got {repr tokens}"
+
 -- Test tokenizing strings
 def testStrings : IO Unit := do
   match tokenizeString "'hello' 'world'" with
@@ -118,6 +130,7 @@ def runLexerTests : IO Unit := do
   IO.println "=== Running Lexer Tests ==="
   testSelectTokens
   testNumbers
+  testFloats
   testStrings
   testOperators
   testKeywords

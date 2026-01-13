@@ -186,7 +186,7 @@ inductive Expr where
   | Star
   | QualifiedStar (table : String)
   | BinaryOp (left : Expr) (op : Operator) (right : Expr)
-  | UnaryOp (op : Keyword) (expr : Expr)
+  | Not (expr : Expr)
 ```
 
 ## References

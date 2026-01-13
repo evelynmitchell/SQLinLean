@@ -112,6 +112,54 @@ def testInvalidSQL : IO Unit := do
   | Sum.inr stmt =>
       IO.println s!"FAIL: testInvalidSQL - Should have failed but got: {repr stmt}"
 
+-- Test error handling: incomplete SELECT
+def testIncompleteSelect : IO Unit := do
+  match parseSQL "SELECT * FROM" with
+  | Sum.inl _ => 
+      IO.println "PASS: testIncompleteSelect"
+  | Sum.inr stmt =>
+      IO.println s!"FAIL: testIncompleteSelect - Should have failed but got: {repr stmt}"
+
+-- Test error handling: incomplete WHERE
+def testIncompleteWhere : IO Unit := do
+  match parseSQL "SELECT * FROM users WHERE" with
+  | Sum.inl _ => 
+      IO.println "PASS: testIncompleteWhere"
+  | Sum.inr stmt =>
+      IO.println s!"FAIL: testIncompleteWhere - Should have failed but got: {repr stmt}"
+
+-- Test error handling: malformed INSERT
+def testMalformedInsert : IO Unit := do
+  match parseSQL "INSERT INTO users (name VALUES (1)" with
+  | Sum.inl _ => 
+      IO.println "PASS: testMalformedInsert"
+  | Sum.inr stmt =>
+      IO.println s!"FAIL: testMalformedInsert - Should have failed but got: {repr stmt}"
+
+-- Test parsing arithmetic expressions
+def testArithmetic : IO Unit := do
+  match parseSQL "SELECT * FROM products WHERE price * quantity > 100" with
+  | Sum.inl err => 
+      IO.println s!"FAIL: testArithmetic - {err}"
+  | Sum.inr stmt =>
+      match stmt with
+      | Statement.Select _ _ (some _) _ _ _ =>
+          IO.println "PASS: testArithmetic"
+      | _ => 
+          IO.println s!"FAIL: testArithmetic - Unexpected parse result: {repr stmt}"
+
+-- Test parsing complex arithmetic with precedence
+def testArithmeticPrecedence : IO Unit := do
+  match parseSQL "SELECT * FROM items WHERE price + tax * rate > 50" with
+  | Sum.inl err => 
+      IO.println s!"FAIL: testArithmeticPrecedence - {err}"
+  | Sum.inr stmt =>
+      match stmt with
+      | Statement.Select _ _ (some _) _ _ _ =>
+          IO.println "PASS: testArithmeticPrecedence"
+      | _ => 
+          IO.println s!"FAIL: testArithmeticPrecedence - Unexpected parse result: {repr stmt}"
+
 -- Run all parser tests
 def runParserTests : IO Unit := do
   IO.println "=== Running Parser Tests ==="
@@ -123,6 +171,11 @@ def runParserTests : IO Unit := do
   testQualifiedIdentifier
   testMultipleWhere
   testInvalidSQL
+  testIncompleteSelect
+  testIncompleteWhere
+  testMalformedInsert
+  testArithmetic
+  testArithmeticPrecedence
   IO.println ""
 
 end SQLinLean.Tests
