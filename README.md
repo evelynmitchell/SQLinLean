@@ -30,7 +30,7 @@ SQLinLean is a comprehensive SQL parser library written in Lean4. It provides:
 1. **SELECT**: Query data with columns, FROM clause, WHERE conditions
 2. **INSERT**: Insert data with VALUES clause
 3. **DELETE**: Delete data with WHERE conditions
-4. **UPDATE**: (partial support)
+4. **UPDATE**: not yet implemented (AST defined, parser pending)
 
 ## Architecture
 

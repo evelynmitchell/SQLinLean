@@ -48,6 +48,19 @@ def testFloats : IO Unit := do
       | _ => 
           IO.println s!"FAIL: testFloats - Got {repr tokens}"
 
+-- Test tokenizing negative numbers (parsed as operator + number)
+def testNegativeNumbers : IO Unit := do
+  match tokenizeString "-5 -3.14" with
+  | LexerResult.error msg _ => 
+      IO.println s!"FAIL: testNegativeNumbers - {msg}"
+  | LexerResult.ok tokens _ =>
+      match tokens with
+      | [Token.Operator Operator.Minus, Token.Literal (Literal.Integer 5), 
+         Token.Operator Operator.Minus, Token.Literal (Literal.Float _), Token.EOF] =>
+          IO.println "PASS: testNegativeNumbers"
+      | _ => 
+          IO.println s!"FAIL: testNegativeNumbers - Got {repr tokens}"
+
 -- Test tokenizing strings
 def testStrings : IO Unit := do
   match tokenizeString "'hello' 'world'" with
@@ -131,6 +144,7 @@ def runLexerTests : IO Unit := do
   testSelectTokens
   testNumbers
   testFloats
+  testNegativeNumbers
   testStrings
   testOperators
   testKeywords

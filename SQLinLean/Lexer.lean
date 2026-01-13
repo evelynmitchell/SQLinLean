@@ -48,16 +48,17 @@ partial def skipWhitespace (s : LexerState) : LexerState :=
     else
       s
 
--- Read while a predicate holds
+-- Read while a predicate holds (optimized to avoid O(n²) string concatenation)
 partial def readWhile (s : LexerState) (pred : Char → Bool) : String × LexerState :=
-  match s.peek with
-  | none => ("", s)
-  | some c =>
-    if pred c then
-      let (rest, finalState) := readWhile (s.advance) pred
-      (String.ofList [c] ++ rest, finalState)
-    else
-      ("", s)
+  let rec loop (state : LexerState) (acc : List Char) : String × LexerState :=
+    match state.peek with
+    | none => (String.mk acc.reverse, state)
+    | some c =>
+      if pred c then
+        loop (state.advance) (c :: acc)
+      else
+        (String.mk acc.reverse, state)
+  loop s []
 
 -- Parse float from string with decimal point
 def parseFloat (s : String) : Option Float :=
@@ -78,7 +79,9 @@ def parseFloat (s : String) : Option Float :=
         let fracLen := fracPart.length
         let denom  := Nat.pow 10 fracLen
         let frac   := (Float.ofNat fracNat) / (Float.ofNat denom)
-        some (Float.ofInt i + frac)
+        -- Handle negative floats: fractional part should match sign of integer part
+        let fracSigned := if i < 0 then -frac else frac
+        some (Float.ofInt i + fracSigned)
       | _, _ => none
   | _ =>
     -- More than one decimal point: invalid
@@ -96,13 +99,13 @@ def tokenizeNumber (s : LexerState) : LexerResult Token :=
     | some i => .ok (.Literal (.Integer i)) newState
     | none => .error "Invalid integer literal" newState
 
--- Tokenize a string literal (single-quoted) - helper function
-partial def readStringContent (acc : String) (state : LexerState) : LexerResult Token :=
+-- Tokenize a string literal (single-quoted) - helper function (optimized)
+partial def readStringContent (acc : List Char) (state : LexerState) : LexerResult Token :=
   match state.peek with
   | none => .error "Unterminated string literal" state
   | some c =>
     if c = '\'' then
-      .ok (.Literal (.String acc)) (state.advance)
+      .ok (.Literal (.String (String.mk acc.reverse))) (state.advance)
     else if c = '\\' then
       -- Handle common escape sequences
       let state := state.advance
@@ -119,21 +122,24 @@ partial def readStringContent (acc : String) (state : LexerState) : LexerResult 
           | '\'' => '\''
           | '"'  => '"'
           | c    => c
-        readStringContent (acc ++ String.ofList [escaped]) (state.advance)
+        readStringContent (escaped :: acc) (state.advance)
     else
-      readStringContent (acc ++ String.ofList [c]) (state.advance)
+      readStringContent (c :: acc) (state.advance)
 
 -- Tokenize a string literal (single-quoted)
 def tokenizeStringLit (s : LexerState) : LexerResult Token :=
   -- Skip opening quote
-  readStringContent "" (s.advance)
+  readStringContent [] (s.advance)
 
 -- Tokenize an identifier or keyword
 def tokenizeIdentifier (s : LexerState) : LexerResult Token :=
   let (ident, newState) := readWhile s isAlphaNumeric
-  match Keyword.fromString? ident with
-  | some kw => .ok (.Keyword kw) newState
-  | none => .ok (.Identifier ident) newState
+  if ident.isEmpty then
+    .error "Invalid identifier" s
+  else
+    match Keyword.fromString? ident with
+    | some kw => .ok (.Keyword kw) newState
+    | none => .ok (.Identifier ident) newState
 
 -- Tokenize a single token
 def tokenizeOne (s : LexerState) : LexerResult Token :=
