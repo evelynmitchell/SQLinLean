@@ -1,0 +1,10 @@
+name = "SQLinLean"
+version = "0.1.0"
+defaultTargets = ["sqlinlean"]
+
+[[lean_lib]]
+name = "SQLinLean"
+
+[[lean_exe]]
+name = "sqlinlean"
+root = "Main"
