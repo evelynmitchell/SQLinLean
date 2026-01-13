@@ -5,6 +5,13 @@ defaultTargets = ["sqlinlean"]
 [[lean_lib]]
 name = "SQLinLean"
 
+[[lean_lib]]
+name = "Tests"
+
 [[lean_exe]]
 name = "sqlinlean"
 root = "Main"
+
+[[lean_exe]]
+name = "tests"
+root = "Tests"
