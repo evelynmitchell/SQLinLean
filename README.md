@@ -173,6 +173,7 @@ inductive Statement where
   | Insert (table : String) (columns : List String) (values : List (List Expr))
   | Update (table : String) (assignments : List (String × Expr)) 
            (whereClause : Option Expr)
+           -- Note: UPDATE parser not yet implemented; AST definition only
   | Delete (table : String) (whereClause : Option Expr)
   | CreateTable (table : String) (columns : List (String × String))
 ```

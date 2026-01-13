@@ -71,7 +71,7 @@ def parseFloat (s : String) : Option Float :=
     | none => none
   | [intPart, fracPart] =>
     -- Exactly one decimal point
-    if fracPart.isEmpty then
+    if intPart.isEmpty || fracPart.isEmpty then
       none
     else
       match intPart.toInt?, fracPart.toNat? with
@@ -134,6 +134,7 @@ def tokenizeStringLit (s : LexerState) : LexerResult Token :=
 -- Tokenize an identifier or keyword
 def tokenizeIdentifier (s : LexerState) : LexerResult Token :=
   let (ident, newState) := readWhile s isAlphaNumeric
+  -- Defensive check: should be unreachable since tokenizeOne validates isAlpha || '_' first
   if ident.isEmpty then
     .error "Invalid identifier" s
   else
