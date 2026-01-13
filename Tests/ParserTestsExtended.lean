@@ -194,32 +194,32 @@ def testArithmeticInSelect : IO Unit := do
           IO.println s!"FAIL: testArithmeticInSelect - Not a SELECT: {repr stmt}"
 
 -- Test WHERE with all comparison operators
-def testAllComparisonOperators : IO Unit := do
+def testParserAllComparisonOperators : IO Unit := do
   match parseSQL "SELECT * FROM t WHERE a = 1" with
   | Sum.inl err => 
-      IO.println s!"FAIL: testAllComparisonOperators(=) - {err}"
+      IO.println s!"FAIL: testParserAllComparisonOperators(=) - {err}"
   | Sum.inr _ =>
       match parseSQL "SELECT * FROM t WHERE a != 1" with
       | Sum.inl err => 
-          IO.println s!"FAIL: testAllComparisonOperators(!=) - {err}"
+          IO.println s!"FAIL: testParserAllComparisonOperators(!=) - {err}"
       | Sum.inr _ =>
           match parseSQL "SELECT * FROM t WHERE a < 1" with
           | Sum.inl err => 
-              IO.println s!"FAIL: testAllComparisonOperators(<) - {err}"
+              IO.println s!"FAIL: testParserAllComparisonOperators(<) - {err}"
           | Sum.inr _ =>
               match parseSQL "SELECT * FROM t WHERE a > 1" with
               | Sum.inl err => 
-                  IO.println s!"FAIL: testAllComparisonOperators(>) - {err}"
+                  IO.println s!"FAIL: testParserAllComparisonOperators(>) - {err}"
               | Sum.inr _ =>
                   match parseSQL "SELECT * FROM t WHERE a <= 1" with
                   | Sum.inl err => 
-                      IO.println s!"FAIL: testAllComparisonOperators(<=) - {err}"
+                      IO.println s!"FAIL: testParserAllComparisonOperators(<=) - {err}"
                   | Sum.inr _ =>
                       match parseSQL "SELECT * FROM t WHERE a >= 1" with
                       | Sum.inl err => 
-                          IO.println s!"FAIL: testAllComparisonOperators(>=) - {err}"
+                          IO.println s!"FAIL: testParserAllComparisonOperators(>=) - {err}"
                       | Sum.inr _ =>
-                          IO.println "PASS: testAllComparisonOperators"
+                          IO.println "PASS: testParserAllComparisonOperators"
 
 -- Test case sensitivity with mixed case
 def testMixedCaseKeywords : IO Unit := do
@@ -297,7 +297,7 @@ def runExtendedParserTests : IO Unit := do
   testSelectWithoutFrom
   testMultipleColumnTypes
   testArithmeticInSelect
-  testAllComparisonOperators
+  testParserAllComparisonOperators
   testMixedCaseKeywords
   -- ORDER BY not yet implemented
   testEmptySQL
