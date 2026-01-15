@@ -57,6 +57,7 @@ mutual
   partial def parsePrimary (s : ParserState) : ParserResult Expr :=
     match s.peek with
     | some (.Literal lit) => ParserResult.ok (.Literal lit) (s.advance)
+    | some (.Keyword .NULL) => ParserResult.ok (.Literal .Null) (s.advance)
     | some .Star => ParserResult.ok .Star (s.advance)
     | some (.Identifier name) =>
       let s' := s.advance
@@ -137,9 +138,19 @@ mutual
         | _ => ParserResult.ok left s'
       | _ => ParserResult.ok left s'
 
+  -- Parse NOT expression (unary prefix operator)
+  partial def parseNot (s : ParserState) : ParserResult Expr :=
+    match s.peek with
+    | some (.Keyword .NOT) =>
+      let s' := s.advance
+      match parseNot s' with
+      | ParserResult.error msg state => ParserResult.error msg state
+      | ParserResult.ok expr s'' => ParserResult.ok (.Not expr) s''
+    | _ => parseComparison s
+
   -- Parse an AND expression
   partial def parseAnd (s : ParserState) : ParserResult Expr :=
-    match parseComparison s with
+    match parseNot s with
     | ParserResult.error msg state => ParserResult.error msg state
     | ParserResult.ok left s' =>
       match s'.peek with
@@ -216,21 +227,32 @@ def parseSelect (s : ParserState) : ParserResult Statement :=
         | .error msg state =>
           -- Propagate error: FROM was present but table name could not be parsed
           .error msg state
-        | .ok tableName s''' =>
-          let fromTable := some (TableRef.Table tableName none)
+        | .ok tableName sAfterTable =>
+          -- Parse optional table alias (AS alias or just alias)
+          -- Note: Keywords like WHERE are tokenized as Token.Keyword, not Token.Identifier,
+          -- so the Identifier pattern below won't match them
+          let (tableAlias, sAfterAlias) := match sAfterTable.peek with
+            | some (.Keyword .AS) =>
+              match parseIdentifier (sAfterTable.advance) with
+              | .ok alias st => (some alias, st)
+              | .error _ _ => (none, sAfterTable)
+            | some (.Identifier alias) =>
+              (some alias, sAfterTable.advance)
+            | _ => (none, sAfterTable)
+          let fromTable := some (TableRef.Table tableName tableAlias)
           -- Parse optional WHERE clause. If WHERE is present, an expression is required.
-          match s'''.peek with
+          match sAfterAlias.peek with
           | some (.Keyword .WHERE) =>
-            match parseExpr (s'''.advance) with
+            match parseExpr (sAfterAlias.advance) with
             | .error msg state =>
               -- Propagate error: WHERE was present but expression could not be parsed
               .error msg state
-            | .ok expr s'''' =>
+            | .ok expr sAfterWhere =>
               let whereClause := some expr
-              .ok (.Select columns fromTable whereClause [] none none) s''''
+              .ok (.Select columns fromTable whereClause [] none none) sAfterWhere
           | _ =>
             let whereClause := (none : Option _)
-            .ok (.Select columns fromTable whereClause [] none none) s'''
+            .ok (.Select columns fromTable whereClause [] none none) sAfterAlias
       | _ =>
         let fromTable := (none : Option TableRef)
         -- Parse optional WHERE clause when there is no FROM
