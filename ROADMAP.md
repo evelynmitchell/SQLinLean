@@ -164,11 +164,11 @@ theorem transpile_correct (q : Statement) :
 **Goal**: Full SQL parsing coverage
 
 **Tasks**:
-- [ ] UPDATE statement parsing
-- [ ] CREATE TABLE parsing
-- [ ] JOIN parsing (INNER, LEFT, RIGHT, OUTER)
-- [ ] ORDER BY, GROUP BY, HAVING
-- [ ] LIMIT, OFFSET
+- [ ] UPDATE statement parser (AST `Statement.Update` already defined)
+- [ ] CREATE TABLE parser (AST `Statement.CreateTable` already defined)
+- [ ] JOIN parser (AST `JoinType`, `TableRef.Join` already defined)
+- [ ] ORDER BY, GROUP BY, HAVING parser (AST fields exist in `Statement.Select`)
+- [ ] LIMIT, OFFSET parser (AST fields exist in `Statement.Select`)
 - [ ] Subqueries
 - [ ] Aggregate functions (COUNT, SUM, AVG, MIN, MAX)
 - [ ] DISTINCT
@@ -240,13 +240,14 @@ def Database := String → Option Table
 
 -- The denotational semantics of SQL
 def eval : Statement → Database → Option Table
-  | .Select cols from where_ orderBy limit offset, db => do
+  | .Select cols from where_ _ _ _, db => do
+    -- Note: orderBy, limit, offset handling omitted for brevity
     let baseTable ← evalFrom from db
     let filtered := evalWhere where_ baseTable
     let projected := evalSelect cols filtered
-    let ordered := evalOrderBy orderBy projected
-    let limited := evalLimit limit offset ordered
-    return limited
+    return projected
+  | .Insert tableName _ values, db => ...
+  | .Delete tableName where_, db => ...
   | ...
 ```
 
