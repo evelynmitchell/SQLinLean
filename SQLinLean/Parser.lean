@@ -57,6 +57,7 @@ mutual
   partial def parsePrimary (s : ParserState) : ParserResult Expr :=
     match s.peek with
     | some (.Literal lit) => ParserResult.ok (.Literal lit) (s.advance)
+    | some (.Keyword .NULL) => ParserResult.ok (.Literal .Null) (s.advance)
     | some .Star => ParserResult.ok .Star (s.advance)
     | some (.Identifier name) =>
       let s' := s.advance
@@ -137,9 +138,19 @@ mutual
         | _ => ParserResult.ok left s'
       | _ => ParserResult.ok left s'
 
+  -- Parse NOT expression (unary prefix operator)
+  partial def parseNot (s : ParserState) : ParserResult Expr :=
+    match s.peek with
+    | some (.Keyword .NOT) =>
+      let s' := s.advance
+      match parseNot s' with
+      | ParserResult.error msg state => ParserResult.error msg state
+      | ParserResult.ok expr s'' => ParserResult.ok (.Not expr) s''
+    | _ => parseComparison s
+
   -- Parse an AND expression
   partial def parseAnd (s : ParserState) : ParserResult Expr :=
-    match parseComparison s with
+    match parseNot s with
     | ParserResult.error msg state => ParserResult.error msg state
     | ParserResult.ok left s' =>
       match s'.peek with
@@ -217,7 +228,18 @@ def parseSelect (s : ParserState) : ParserResult Statement :=
           -- Propagate error: FROM was present but table name could not be parsed
           .error msg state
         | .ok tableName s''' =>
-          let fromTable := some (TableRef.Table tableName none)
+          -- Parse optional table alias (AS alias or just alias)
+          let (tableAlias, s'''') := match s'''.peek with
+            | some (.Keyword .AS) =>
+              match parseIdentifier (s'''.advance) with
+              | .ok alias st => (some alias, st)
+              | .error _ _ => (none, s''')
+            | some (.Identifier alias) =>
+              -- Check it's not a keyword like WHERE
+              (some alias, s'''.advance)
+            | _ => (none, s''')
+          let fromTable := some (TableRef.Table tableName tableAlias)
+          let s''' := s''''  -- Continue with updated state
           -- Parse optional WHERE clause. If WHERE is present, an expression is required.
           match s'''.peek with
           | some (.Keyword .WHERE) =>
