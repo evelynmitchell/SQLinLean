@@ -212,6 +212,71 @@ partial def parseList {α : Type} (parser : ParserState → ParserResult α)
       | .ok rest s''' => .ok (item :: rest) s'''
     | _ => .ok [item] s'
 
+-- Parse a natural number from a literal
+def parseNat (s : ParserState) : ParserResult Nat :=
+  match s.peek with
+  | some (.Literal (.Integer n)) =>
+    if n >= 0 then .ok n.toNat (s.advance)
+    else .error "Expected non-negative integer" s
+  | some t => .error s!"Expected integer, got {repr t}" s
+  | none => .error "Expected integer, got EOF" s
+
+-- Parse ORDER BY item: expr [ASC|DESC]
+def parseOrderByItem (s : ParserState) : ParserResult (Expr × Bool) :=
+  match parseExpr s with
+  | .error msg state => .error msg state
+  | .ok expr s' =>
+    match s'.peek with
+    | some (.Keyword .ASC) => .ok (expr, true) (s'.advance)
+    | some (.Keyword .DESC) => .ok (expr, false) (s'.advance)
+    | _ => .ok (expr, true) s'  -- Default to ascending
+
+-- Parse ORDER BY clause: ORDER BY expr [ASC|DESC] [, ...]
+partial def parseOrderBy (s : ParserState) : ParserResult (List (Expr × Bool)) :=
+  match s.peek with
+  | some (.Keyword .ORDER) =>
+    let s' := s.advance
+    match s'.peek with
+    | some (.Keyword .BY) =>
+      let s'' := s'.advance
+      parseList parseOrderByItem s''
+    | _ => .error "Expected BY after ORDER" s'
+  | _ => .ok [] s  -- No ORDER BY clause
+
+-- Parse LIMIT clause: LIMIT n
+def parseLimit (s : ParserState) : ParserResult (Option Nat) :=
+  match s.peek with
+  | some (.Keyword .LIMIT) =>
+    let s' := s.advance
+    match parseNat s' with
+    | .error msg state => .error msg state
+    | .ok n s'' => .ok (some n) s''
+  | _ => .ok none s
+
+-- Parse OFFSET clause: OFFSET n
+def parseOffset (s : ParserState) : ParserResult (Option Nat) :=
+  match s.peek with
+  | some (.Keyword .OFFSET) =>
+    let s' := s.advance
+    match parseNat s' with
+    | .error msg state => .error msg state
+    | .ok n s'' => .ok (some n) s''
+  | _ => .ok none s
+
+-- Helper to parse the trailing clauses (ORDER BY, LIMIT, OFFSET) after WHERE
+def parseSelectTrailing (columns : List SelectItem) (fromTable : Option TableRef)
+    (whereClause : Option Expr) (s : ParserState) : ParserResult Statement :=
+  match parseOrderBy s with
+  | .error msg state => .error msg state
+  | .ok orderBy s' =>
+    match parseLimit s' with
+    | .error msg state => .error msg state
+    | .ok limit s'' =>
+      match parseOffset s'' with
+      | .error msg state => .error msg state
+      | .ok offset s''' =>
+        .ok (.Select columns fromTable whereClause orderBy limit offset) s'''
+
 -- Parse SELECT statement
 def parseSelect (s : ParserState) : ParserResult Statement :=
   match expectKeyword .SELECT s with
@@ -248,11 +313,9 @@ def parseSelect (s : ParserState) : ParserResult Statement :=
               -- Propagate error: WHERE was present but expression could not be parsed
               .error msg state
             | .ok expr sAfterWhere =>
-              let whereClause := some expr
-              .ok (.Select columns fromTable whereClause [] none none) sAfterWhere
+              parseSelectTrailing columns fromTable (some expr) sAfterWhere
           | _ =>
-            let whereClause := (none : Option _)
-            .ok (.Select columns fromTable whereClause [] none none) sAfterAlias
+            parseSelectTrailing columns fromTable none sAfterAlias
       | _ =>
         let fromTable := (none : Option TableRef)
         -- Parse optional WHERE clause when there is no FROM
@@ -263,11 +326,9 @@ def parseSelect (s : ParserState) : ParserResult Statement :=
             -- Propagate error: WHERE was present but expression could not be parsed
             .error msg state
           | .ok expr s''' =>
-            let whereClause := some expr
-            .ok (.Select columns fromTable whereClause [] none none) s'''
+            parseSelectTrailing columns fromTable (some expr) s'''
         | _ =>
-          let whereClause := (none : Option _)
-          .ok (.Select columns fromTable whereClause [] none none) s''
+          parseSelectTrailing columns fromTable none s''
 
 -- Parse INSERT statement
 def parseInsert (s : ParserState) : ParserResult Statement :=
