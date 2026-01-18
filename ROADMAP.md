@@ -112,7 +112,7 @@ def invalidQuery : ValidQuery mySchema :=
 **Concrete Example**:
 ```lean
 -- Are these equivalent?
-def q1 := sql! "SELECT * FROM users WHERE age > 18 AND age < 65"
+def q1 := sql! "SELECT * FROM users WHERE age >= 19 AND age <= 64"
 def q2 := sql! "SELECT * FROM users WHERE age BETWEEN 19 AND 64"
 
 -- Prove equivalence (or find counterexample)
@@ -164,11 +164,11 @@ theorem transpile_correct (q : Statement) :
 **Goal**: Full SQL parsing coverage
 
 **Tasks**:
-- [ ] UPDATE statement parser (AST `Statement.Update` already defined)
-- [ ] CREATE TABLE parser (AST `Statement.CreateTable` already defined)
-- [ ] JOIN parser (AST `JoinType`, `TableRef.Join` already defined)
-- [ ] ORDER BY, GROUP BY, HAVING parser (AST fields exist in `Statement.Select`)
-- [ ] LIMIT, OFFSET parser (AST fields exist in `Statement.Select`)
+- [ ] UPDATE statement parser implementation (AST already defined)
+- [ ] Implement parser support for `CREATE TABLE` statements (AST constructor already defined)
+- [ ] Implement JOIN parsing (INNER, LEFT, RIGHT, OUTER) in the parser, using existing JoinType/Join/TableRef AST support
+- [ ] ORDER BY (parser implementation; AST fields already exist), GROUP BY, HAVING
+- [ ] LIMIT, OFFSET (parser implementation; AST fields already exist)
 - [ ] Subqueries
 - [ ] Aggregate functions (COUNT, SUM, AVG, MIN, MAX)
 - [ ] DISTINCT
@@ -240,8 +240,7 @@ def Database := String → Option Table
 
 -- The denotational semantics of SQL
 def eval : Statement → Database → Option Table
-  | .Select cols from where_ _ _ _, db => do
-    -- Note: orderBy, limit, offset handling omitted for brevity
+  | .Select cols from where_, db => do
     let baseTable ← evalFrom from db
     let filtered := evalWhere where_ baseTable
     let projected := evalSelect cols filtered
