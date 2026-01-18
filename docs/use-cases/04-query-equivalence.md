@@ -57,11 +57,27 @@ theorem q1_equiv_q2 : equivalent q1 q2 := by ...
 2. **Interactive proofs** - Manual proofs with Lean tactics
 3. **Hybrid** - Automated for simple cases, interactive for complex
 
+## NULL Handling (3-Valued Logic)
+
+SQL's 3-valued logic (`TRUE`, `FALSE`, `NULL`) is a frequent source of bugs and equivalence failures.
+
+**Example:** These queries are NOT equivalent due to NULL:
+```sql
+-- Query A: Returns rows where age is known and > 18
+SELECT * FROM users WHERE age > 18
+
+-- Query B: Returns rows where age is NOT <= 18 (includes NULL!)
+SELECT * FROM users WHERE NOT (age <= 18)
+```
+
+Lean can encode 3-valued logic to catch these subtle differences.
+
 ## Open Questions
 
 - Decidability boundaries (which SQL subset is decidable?)
-- NULL handling complexity
+- NULL handling complexity - need formal 3-valued logic model
 - Aggregation equivalence
+- Bag vs set semantics
 
 ## Notes & Ideas
 

@@ -63,6 +63,28 @@ def detectTautology (expr : Expr) : Bool := ...
 - IDE/editor plugins
 - Pre-commit hooks
 
+## Why Lean Over a Standard LSP?
+
+| Feature | Standard LSP | Lean 4 |
+|---------|--------------|--------|
+| Check Syntax | Best (fast, standard) | Overkill |
+| Autocomplete | Best (context aware) | Non-existent |
+| Type Checking | Partial (if connected to DB) | Guaranteed |
+| Logic Verification | Impossible | Primary use case |
+| Refactoring Safety | "Fingers crossed" | Provable |
+
+**Recommendation:** Use LSP for the *writing* loop (autocomplete, highlighting). Use Lean for the *committing* loop (CI/CD, critical query verification).
+
+## Property-Based Testing for Linting
+
+Use SlimCheck (Lean's PBT library) to verify lint rules:
+
+| Property | Description |
+|----------|-------------|
+| Round-Trip | `parse(print(ast)) == ast` |
+| Idempotence | `normalize(normalize(sql)) == normalize(sql)` |
+| No False Positives | Valid patterns shouldn't trigger warnings |
+
 ## Open Questions
 
 - Output format (JSON, SARIF, plain text)?

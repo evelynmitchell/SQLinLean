@@ -21,6 +21,8 @@ Query optimizers transform SQL into equivalent but faster forms. Bugs in optimiz
 - "Verified Query Optimization" (CIDR 2019)
 - HoTTSQL: Proving Query Rewrites with Univalent SQL Semantics
 - Cosette (SQL equivalence verifier): https://cosette.cs.washington.edu/
+- provenance-lean: SQL formalization in Lean 4 (semiring provenance)
+- [CAV 2024 Keynote: Lean 4 Bridging Formal Mathematics and Software Verification](https://www.youtube.com/watch?v=iM_0Rxqqn7Y)
 
 ## Implementation Ideas
 

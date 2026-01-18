@@ -23,6 +23,7 @@ SQL queries in application code are typically strings - no compile-time checking
 
 ## Implementation Ideas
 
+### Basic Schema-Aware Query
 ```lean
 -- Define your schema in Lean
 def mySchema : Schema := {
@@ -41,6 +42,42 @@ def validQuery : ValidQuery mySchema :=
 -- This would FAIL to compile - 'email' column doesn't exist
 def invalidQuery : ValidQuery mySchema :=
   query! "SELECT email FROM users"  -- Compile error!
+```
+
+### Dependent Types for Column Validation
+```lean
+-- A schema is a list of column names
+def Schema := List String
+
+-- A Column requires a PROOF that the name exists in the schema
+structure Column (s : Schema) where
+  name : String
+  h    : name ∈ s
+
+def UserTable : Schema := ["id", "username", "email", "created_at"]
+
+-- ✅ VALID: Compiles because "email" is in UserTable
+def validCol : Column UserTable :=
+  { name := "email", h := by simp }
+
+-- ❌ INVALID: Won't compile - "phone" not in UserTable
+-- def invalidCol : Column UserTable :=
+--   { name := "phone", h := by simp }  -- Tactic failure!
+```
+
+### Two-Phase Strategy
+1. **Layer 1 (Parser):** Parse to Raw AST (schema-agnostic, always succeeds for valid syntax)
+2. **Layer 2 (Validator):** Upgrade Raw AST to Typed AST given a schema
+
+```lean
+def validate (s : Schema) (raw : RawExpr) : Except String (TypedExpr s) :=
+  match raw with
+  | .col name =>
+      if h : name ∈ s then
+        return TypedExpr.col name h
+      else
+        throw s!"Error: Column '{name}' not found in schema."
+  | ...
 ```
 
 ## Features to Implement
