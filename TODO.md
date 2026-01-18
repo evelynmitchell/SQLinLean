@@ -16,8 +16,8 @@ Based on ROADMAP.md Phase 1 and expected corpus failures:
 
 ### High Priority (Common in Real Queries)
 - [ ] JOIN parsing (INNER, LEFT, RIGHT, OUTER) - Issue: AST exists
-- [ ] ORDER BY parsing - Issue: AST field exists
-- [ ] LIMIT/OFFSET parsing - Issue: AST field exists
+- [x] ORDER BY parsing (PR #29) ✓
+- [x] LIMIT/OFFSET parsing (PR #29) ✓
 - [ ] Aggregate functions (COUNT, SUM, AVG, MIN, MAX)
 - [ ] GROUP BY / HAVING
 
