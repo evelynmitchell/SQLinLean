@@ -76,6 +76,20 @@ curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf 
 lake build
 ```
 
+### GitHub Codespaces
+
+For a quick setup in GitHub Codespaces, run the setup script:
+```bash
+./setup_codespaces.sh
+```
+
+This script automatically:
+- Installs elan (Lean version manager)
+- Installs the Lean4 toolchain
+- Builds the project with `lake build`
+- Installs Claude Code CLI
+- Configures pre-commit hooks (if available)
+
 ## Usage
 
 ### As a Library
