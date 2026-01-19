@@ -1,26 +1,10 @@
 -- Tests for SQL Lexer
-import SQLinLean.Lexer
 import SQLinLean.Token
+import Tests.TestHelpers
 
-namespace SQLinLean.Tests
+namespace SQLinLean.Tests.Lexer
 
-open SQLinLean
-
--- Test helper: tokenize and compare expected tokens
-def lexTest (name : String) (input : String) (expected : List Token) : IO Unit := do
-  match tokenizeString input with
-  | LexerResult.error msg _ => IO.println s!"FAIL: {name} - {msg}"
-  | LexerResult.ok tokens _ =>
-      if tokens == expected then IO.println s!"PASS: {name}"
-      else IO.println s!"FAIL: {name} - Expected {repr expected}, got {repr tokens}"
-
--- Test helper: tokenize and validate with custom predicate
-def lexTestWith (name : String) (input : String) (validate : List Token → Bool) : IO Unit := do
-  match tokenizeString input with
-  | LexerResult.error msg _ => IO.println s!"FAIL: {name} - {msg}"
-  | LexerResult.ok tokens _ =>
-      if validate tokens then IO.println s!"PASS: {name}"
-      else IO.println s!"FAIL: {name} - Got {repr tokens}"
+open SQLinLean SQLinLean.Tests
 
 def testSelectTokens : IO Unit :=
   lexTest "testSelectTokens" "SELECT * FROM users"
@@ -72,4 +56,4 @@ def runLexerTests : IO Unit := do
   testCaseInsensitivity
   IO.println ""
 
-end SQLinLean.Tests
+end SQLinLean.Tests.Lexer

@@ -1,24 +1,10 @@
 -- Extended Parser Tests inspired by sqlglot test suite
-import SQLinLean.Parser
 import SQLinLean.AST
-import SQLinLean.Token
+import Tests.TestHelpers
 
-namespace SQLinLean.Tests
+namespace SQLinLean.Tests.ParserExtended
 
-open SQLinLean
-
--- Test helpers (same as ParserTests.lean)
-def parseTest (name : String) (input : String) (validate : Statement → Bool) : IO Unit := do
-  match parseSQL input with
-  | Sum.inl err => IO.println s!"FAIL: {name} - {err}"
-  | Sum.inr stmt =>
-      if validate stmt then IO.println s!"PASS: {name}"
-      else IO.println s!"FAIL: {name} - Got {repr stmt}"
-
-def parseFailTest (name : String) (input : String) : IO Unit := do
-  match parseSQL input with
-  | Sum.inl _ => IO.println s!"PASS: {name}"
-  | Sum.inr stmt => IO.println s!"FAIL: {name} - Should have failed but got: {repr stmt}"
+open SQLinLean SQLinLean.Tests
 
 -- Column alias tests
 def testSelectWithAlias : IO Unit :=
@@ -399,4 +385,4 @@ def runExtendedParserTests : IO Unit := do
   testSelectDistinct; testSelectDistinctMultiple; testSelectNotDistinct; testSelectDistinctWhere
   IO.println ""
 
-end SQLinLean.Tests
+end SQLinLean.Tests.ParserExtended

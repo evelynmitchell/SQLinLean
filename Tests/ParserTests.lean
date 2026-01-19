@@ -1,25 +1,10 @@
 -- Tests for SQL Parser
-import SQLinLean.Parser
 import SQLinLean.AST
-import SQLinLean.Token
+import Tests.TestHelpers
 
-namespace SQLinLean.Tests
+namespace SQLinLean.Tests.Parser
 
-open SQLinLean
-
--- Test helper: parse and validate with custom predicate
-def parseTest (name : String) (input : String) (validate : Statement → Bool) : IO Unit := do
-  match parseSQL input with
-  | Sum.inl err => IO.println s!"FAIL: {name} - {err}"
-  | Sum.inr stmt =>
-      if validate stmt then IO.println s!"PASS: {name}"
-      else IO.println s!"FAIL: {name} - Got {repr stmt}"
-
--- Test helper: expect parse failure
-def parseFailTest (name : String) (input : String) : IO Unit := do
-  match parseSQL input with
-  | Sum.inl _ => IO.println s!"PASS: {name}"
-  | Sum.inr stmt => IO.println s!"FAIL: {name} - Should have failed but got: {repr stmt}"
+open SQLinLean SQLinLean.Tests
 
 def testSimpleSelect : IO Unit :=
   parseTest "testSimpleSelect" "SELECT * FROM users" fun
@@ -90,4 +75,4 @@ def runParserTests : IO Unit := do
   testArithmeticPrecedence
   IO.println ""
 
-end SQLinLean.Tests
+end SQLinLean.Tests.Parser

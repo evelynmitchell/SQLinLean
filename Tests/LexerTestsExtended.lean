@@ -1,30 +1,10 @@
 -- Extended Lexer Tests inspired by sqlglot test suite
-import SQLinLean.Lexer
 import SQLinLean.Token
+import Tests.TestHelpers
 
-namespace SQLinLean.Tests
+namespace SQLinLean.Tests.LexerExtended
 
-open SQLinLean
-
--- Test helpers (same as LexerTests.lean)
-def lexTest (name : String) (input : String) (expected : List Token) : IO Unit := do
-  match tokenizeString input with
-  | LexerResult.error msg _ => IO.println s!"FAIL: {name} - {msg}"
-  | LexerResult.ok tokens _ =>
-      if tokens == expected then IO.println s!"PASS: {name}"
-      else IO.println s!"FAIL: {name} - Expected {repr expected}, got {repr tokens}"
-
-def lexTestWith (name : String) (input : String) (validate : List Token → Bool) : IO Unit := do
-  match tokenizeString input with
-  | LexerResult.error msg _ => IO.println s!"FAIL: {name} - {msg}"
-  | LexerResult.ok tokens _ =>
-      if validate tokens then IO.println s!"PASS: {name}"
-      else IO.println s!"FAIL: {name} - Got {repr tokens}"
-
-def lexFailTest (name : String) (input : String) : IO Unit := do
-  match tokenizeString input with
-  | LexerResult.error _ _ => IO.println s!"PASS: {name}"
-  | LexerResult.ok tokens _ => IO.println s!"FAIL: {name} - Should have failed but got: {repr tokens}"
+open SQLinLean SQLinLean.Tests
 
 def testWhitespaceVariations : IO Unit :=
   lexTest "testWhitespaceVariations" "SELECT  \t  *  \n  FROM\r\n  users"
@@ -109,4 +89,4 @@ def runExtendedLexerTests : IO Unit := do
   testInvalidExclamation
   IO.println ""
 
-end SQLinLean.Tests
+end SQLinLean.Tests.LexerExtended
