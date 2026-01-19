@@ -26,6 +26,7 @@ inductive Keyword where
   | RIGHT
   | INNER
   | OUTER
+  | FULL
   | ON
   | ORDER
   | BY
@@ -102,6 +103,7 @@ def Keyword.toString : Keyword → String
   | .RIGHT => "RIGHT"
   | .INNER => "INNER"
   | .OUTER => "OUTER"
+  | .FULL => "FULL"
   | .ON => "ON"
   | .ORDER => "ORDER"
   | .BY => "BY"
@@ -137,6 +139,7 @@ def Keyword.fromString? (s : String) : Option Keyword :=
   | "RIGHT" => some .RIGHT
   | "INNER" => some .INNER
   | "OUTER" => some .OUTER
+  | "FULL" => some .FULL
   | "ON" => some .ON
   | "ORDER" => some .ORDER
   | "BY" => some .BY

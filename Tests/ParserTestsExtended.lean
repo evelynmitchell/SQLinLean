@@ -350,10 +350,121 @@ def testInvalidInsert : IO Unit := do
 -- Test unclosed parenthesis (error case)
 def testUnclosedParenthesis : IO Unit := do
   match parseSQL "INSERT INTO users VALUES (1, 'Alice'" with
-  | Sum.inl _ => 
+  | Sum.inl _ =>
       IO.println "PASS: testUnclosedParenthesis"
   | Sum.inr stmt =>
       IO.println s!"FAIL: testUnclosedParenthesis - Should have failed but got: {repr stmt}"
+
+-- Test INNER JOIN
+def testInnerJoin : IO Unit := do
+  match parseSQL "SELECT * FROM users INNER JOIN orders ON users.id = orders.user_id" with
+  | Sum.inl err =>
+      IO.println s!"FAIL: testInnerJoin - {err}"
+  | Sum.inr stmt =>
+      match stmt with
+      | Statement.Select _ (some (TableRef.Join _ .Inner _ _)) _ _ _ _ =>
+          IO.println "PASS: testInnerJoin"
+      | _ =>
+          IO.println s!"FAIL: testInnerJoin - Unexpected parse result: {repr stmt}"
+
+-- Test LEFT JOIN
+def testLeftJoin : IO Unit := do
+  match parseSQL "SELECT * FROM users LEFT JOIN orders ON users.id = orders.user_id" with
+  | Sum.inl err =>
+      IO.println s!"FAIL: testLeftJoin - {err}"
+  | Sum.inr stmt =>
+      match stmt with
+      | Statement.Select _ (some (TableRef.Join _ .Left _ _)) _ _ _ _ =>
+          IO.println "PASS: testLeftJoin"
+      | _ =>
+          IO.println s!"FAIL: testLeftJoin - Unexpected parse result: {repr stmt}"
+
+-- Test LEFT OUTER JOIN
+def testLeftOuterJoin : IO Unit := do
+  match parseSQL "SELECT * FROM users LEFT OUTER JOIN orders ON users.id = orders.user_id" with
+  | Sum.inl err =>
+      IO.println s!"FAIL: testLeftOuterJoin - {err}"
+  | Sum.inr stmt =>
+      match stmt with
+      | Statement.Select _ (some (TableRef.Join _ .Left _ _)) _ _ _ _ =>
+          IO.println "PASS: testLeftOuterJoin"
+      | _ =>
+          IO.println s!"FAIL: testLeftOuterJoin - Unexpected parse result: {repr stmt}"
+
+-- Test RIGHT JOIN
+def testRightJoin : IO Unit := do
+  match parseSQL "SELECT * FROM users RIGHT JOIN orders ON users.id = orders.user_id" with
+  | Sum.inl err =>
+      IO.println s!"FAIL: testRightJoin - {err}"
+  | Sum.inr stmt =>
+      match stmt with
+      | Statement.Select _ (some (TableRef.Join _ .Right _ _)) _ _ _ _ =>
+          IO.println "PASS: testRightJoin"
+      | _ =>
+          IO.println s!"FAIL: testRightJoin - Unexpected parse result: {repr stmt}"
+
+-- Test plain JOIN (defaults to INNER)
+def testPlainJoin : IO Unit := do
+  match parseSQL "SELECT * FROM users JOIN orders ON users.id = orders.user_id" with
+  | Sum.inl err =>
+      IO.println s!"FAIL: testPlainJoin - {err}"
+  | Sum.inr stmt =>
+      match stmt with
+      | Statement.Select _ (some (TableRef.Join _ .Inner _ _)) _ _ _ _ =>
+          IO.println "PASS: testPlainJoin"
+      | _ =>
+          IO.println s!"FAIL: testPlainJoin - Unexpected parse result: {repr stmt}"
+
+-- Test JOIN with table aliases
+def testJoinWithAliases : IO Unit := do
+  match parseSQL "SELECT u.name, o.total FROM users AS u JOIN orders AS o ON u.id = o.user_id" with
+  | Sum.inl err =>
+      IO.println s!"FAIL: testJoinWithAliases - {err}"
+  | Sum.inr stmt =>
+      match stmt with
+      | Statement.Select cols (some (TableRef.Join (TableRef.Table "users" (some "u")) .Inner (TableRef.Table "orders" (some "o")) _)) _ _ _ _ =>
+          if cols.length == 2 then
+            IO.println "PASS: testJoinWithAliases"
+          else
+            IO.println s!"FAIL: testJoinWithAliases - Expected 2 columns, got {cols.length}"
+      | _ =>
+          IO.println s!"FAIL: testJoinWithAliases - Unexpected parse result: {repr stmt}"
+
+-- Test multiple JOINs
+def testMultipleJoins : IO Unit := do
+  match parseSQL "SELECT * FROM a JOIN b ON a.id = b.a_id JOIN c ON b.id = c.b_id" with
+  | Sum.inl err =>
+      IO.println s!"FAIL: testMultipleJoins - {err}"
+  | Sum.inr stmt =>
+      match stmt with
+      | Statement.Select _ (some (TableRef.Join (TableRef.Join _ _ _ _) _ _ _)) _ _ _ _ =>
+          IO.println "PASS: testMultipleJoins"
+      | _ =>
+          IO.println s!"FAIL: testMultipleJoins - Unexpected parse result: {repr stmt}"
+
+-- Test JOIN with WHERE clause
+def testJoinWithWhere : IO Unit := do
+  match parseSQL "SELECT * FROM users u JOIN orders o ON u.id = o.user_id WHERE o.total > 100" with
+  | Sum.inl err =>
+      IO.println s!"FAIL: testJoinWithWhere - {err}"
+  | Sum.inr stmt =>
+      match stmt with
+      | Statement.Select _ (some (TableRef.Join _ _ _ _)) (some _) _ _ _ =>
+          IO.println "PASS: testJoinWithWhere"
+      | _ =>
+          IO.println s!"FAIL: testJoinWithWhere - Unexpected parse result: {repr stmt}"
+
+-- Test FULL OUTER JOIN
+def testFullOuterJoin : IO Unit := do
+  match parseSQL "SELECT * FROM a FULL OUTER JOIN b ON a.id = b.a_id" with
+  | Sum.inl err =>
+      IO.println s!"FAIL: testFullOuterJoin - {err}"
+  | Sum.inr stmt =>
+      match stmt with
+      | Statement.Select _ (some (TableRef.Join _ .Full _ _)) _ _ _ _ =>
+          IO.println "PASS: testFullOuterJoin"
+      | _ =>
+          IO.println s!"FAIL: testFullOuterJoin - Unexpected parse result: {repr stmt}"
 
 -- Run all extended parser tests
 def runExtendedParserTests : IO Unit := do
@@ -386,6 +497,15 @@ def runExtendedParserTests : IO Unit := do
   testMissingWhereExpression
   testInvalidInsert
   testUnclosedParenthesis
+  testInnerJoin
+  testLeftJoin
+  testLeftOuterJoin
+  testRightJoin
+  testPlainJoin
+  testJoinWithAliases
+  testMultipleJoins
+  testJoinWithWhere
+  testFullOuterJoin
   IO.println ""
 
 end SQLinLean.Tests

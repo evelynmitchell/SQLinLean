@@ -92,10 +92,10 @@ def testSemicolon : IO Unit := do
 -- Test multiple statements
 def testMultipleStatements : IO Unit := do
   match tokenizeString "SELECT 1; SELECT 2;" with
-  | LexerResult.error msg _ => 
+  | LexerResult.error msg _ =>
       IO.println s!"FAIL: testMultipleStatements - {msg}"
   | LexerResult.ok tokens _ =>
-      let expectedCount := 9  -- SELECT, 1, ;, SELECT, 2, ;, EOF
+      let expectedCount := 7  -- SELECT, 1, ;, SELECT, 2, ;, EOF
       if tokens.length == expectedCount then
         IO.println "PASS: testMultipleStatements"
       else
@@ -200,13 +200,14 @@ def testMixedKeywordsIdentifiers : IO Unit := do
 -- Test complex SQL expression tokenization
 def testComplexExpression : IO Unit := do
   match tokenizeString "price * (1 + tax_rate) >= 100.00" with
-  | LexerResult.error msg _ => 
+  | LexerResult.error msg _ =>
       IO.println s!"FAIL: testComplexExpression - {msg}"
   | LexerResult.ok tokens _ =>
-      if tokens.length == 12 then  -- All tokens including operators and parentheses
+      -- price, *, (, 1, +, tax_rate, ), >=, 100.00, EOF
+      if tokens.length == 10 then
         IO.println "PASS: testComplexExpression"
       else
-        IO.println s!"FAIL: testComplexExpression - Expected 12 tokens, got {tokens.length}: {repr tokens}"
+        IO.println s!"FAIL: testComplexExpression - Expected 10 tokens, got {tokens.length}: {repr tokens}"
 
 -- Test all comparison operators
 def testAllComparisonOperators : IO Unit := do

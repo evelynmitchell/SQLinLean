@@ -221,6 +221,87 @@ def parseNat (s : ParserState) : ParserResult Nat :=
   | some t => .error s!"Expected integer, got {repr t}" s
   | none => .error "Expected integer, got EOF" s
 
+-- Parse a simple table reference (table name with optional alias)
+def parseTableRefSimple (s : ParserState) : ParserResult TableRef :=
+  match parseIdentifier s with
+  | .error msg state => .error msg state
+  | .ok tableName s' =>
+    let (tableAlias, s'') := match s'.peek with
+      | some (.Keyword .AS) =>
+        match parseIdentifier (s'.advance) with
+        | .ok alias st => (some alias, st)
+        | .error _ _ => (none, s')
+      | some (.Identifier alias) =>
+        (some alias, s'.advance)
+      | _ => (none, s')
+    .ok (TableRef.Table tableName tableAlias) s''
+
+-- Try to parse a join type keyword sequence
+-- Returns (some joinType, state after JOIN keyword) or (none, original state)
+def tryParseJoinType (s : ParserState) : Option JoinType × ParserState :=
+  match s.peek with
+  | some (.Keyword .INNER) =>
+    let s' := s.advance
+    match s'.peek with
+    | some (.Keyword .JOIN) => (some .Inner, s'.advance)
+    | _ => (none, s)
+  | some (.Keyword .LEFT) =>
+    let s' := s.advance
+    match s'.peek with
+    | some (.Keyword .OUTER) =>
+      let s'' := s'.advance
+      match s''.peek with
+      | some (.Keyword .JOIN) => (some .Left, s''.advance)
+      | _ => (none, s)
+    | some (.Keyword .JOIN) => (some .Left, s'.advance)
+    | _ => (none, s)
+  | some (.Keyword .RIGHT) =>
+    let s' := s.advance
+    match s'.peek with
+    | some (.Keyword .OUTER) =>
+      let s'' := s'.advance
+      match s''.peek with
+      | some (.Keyword .JOIN) => (some .Right, s''.advance)
+      | _ => (none, s)
+    | some (.Keyword .JOIN) => (some .Right, s'.advance)
+    | _ => (none, s)
+  | some (.Keyword .FULL) =>
+    let s' := s.advance
+    match s'.peek with
+    | some (.Keyword .OUTER) =>
+      let s'' := s'.advance
+      match s''.peek with
+      | some (.Keyword .JOIN) => (some .Full, s''.advance)
+      | _ => (none, s)
+    | some (.Keyword .JOIN) => (some .Full, s'.advance)
+    | _ => (none, s)
+  | some (.Keyword .JOIN) => (some .Inner, s.advance)  -- Plain JOIN = INNER JOIN
+  | _ => (none, s)
+
+-- Parse table reference with optional joins
+-- Handles: table [AS alias] [[INNER|LEFT|RIGHT|FULL] [OUTER] JOIN table [AS alias] ON expr]*
+partial def parseTableRef (s : ParserState) : ParserResult TableRef :=
+  match parseTableRefSimple s with
+  | .error msg state => .error msg state
+  | .ok table s' => parseTableRefJoins table s'
+where
+  parseTableRefJoins (leftTable : TableRef) (s : ParserState) : ParserResult TableRef :=
+    let (joinType, s') := tryParseJoinType s
+    match joinType with
+    | none => .ok leftTable s  -- No more joins
+    | some jt =>
+      match parseTableRefSimple s' with
+      | .error msg state => .error msg state
+      | .ok rightTable s'' =>
+        match s''.peek with
+        | some (.Keyword .ON) =>
+          match parseExpr (s''.advance) with
+          | .error msg state => .error msg state
+          | .ok condition s''' =>
+            let joinedTable := TableRef.Join leftTable jt rightTable condition
+            parseTableRefJoins joinedTable s'''
+        | _ => .error "Expected ON after JOIN table" s''
+
 -- Parse ORDER BY item: expr [ASC|DESC]
 def parseOrderByItem (s : ParserState) : ParserResult (Expr × Bool) :=
   match parseExpr s with
@@ -285,46 +366,29 @@ def parseSelect (s : ParserState) : ParserResult Statement :=
     match parseList parseSelectItem s' with
     | .error msg state => .error msg state
     | .ok columns s'' =>
-      -- Parse optional FROM clause. If FROM is present, a table name is required.
+      -- Parse optional FROM clause with optional JOINs
       match s''.peek with
       | some (.Keyword .FROM) =>
-        match parseIdentifier (s''.advance) with
-        | .error msg state =>
-          -- Propagate error: FROM was present but table name could not be parsed
-          .error msg state
-        | .ok tableName sAfterTable =>
-          -- Parse optional table alias (AS alias or just alias)
-          -- Note: Keywords like WHERE are tokenized as Token.Keyword, not Token.Identifier,
-          -- so the Identifier pattern below won't match them
-          let (tableAlias, sAfterAlias) := match sAfterTable.peek with
-            | some (.Keyword .AS) =>
-              match parseIdentifier (sAfterTable.advance) with
-              | .ok alias st => (some alias, st)
-              | .error _ _ => (none, sAfterTable)
-            | some (.Identifier alias) =>
-              (some alias, sAfterTable.advance)
-            | _ => (none, sAfterTable)
-          let fromTable := some (TableRef.Table tableName tableAlias)
-          -- Parse optional WHERE clause. If WHERE is present, an expression is required.
-          match sAfterAlias.peek with
+        match parseTableRef (s''.advance) with
+        | .error msg state => .error msg state
+        | .ok tableRef sAfterFrom =>
+          let fromTable := some tableRef
+          -- Parse optional WHERE clause
+          match sAfterFrom.peek with
           | some (.Keyword .WHERE) =>
-            match parseExpr (sAfterAlias.advance) with
-            | .error msg state =>
-              -- Propagate error: WHERE was present but expression could not be parsed
-              .error msg state
+            match parseExpr (sAfterFrom.advance) with
+            | .error msg state => .error msg state
             | .ok expr sAfterWhere =>
               parseSelectTrailing columns fromTable (some expr) sAfterWhere
           | _ =>
-            parseSelectTrailing columns fromTable none sAfterAlias
+            parseSelectTrailing columns fromTable none sAfterFrom
       | _ =>
         let fromTable := (none : Option TableRef)
         -- Parse optional WHERE clause when there is no FROM
         match s''.peek with
         | some (.Keyword .WHERE) =>
           match parseExpr (s''.advance) with
-          | .error msg state =>
-            -- Propagate error: WHERE was present but expression could not be parsed
-            .error msg state
+          | .error msg state => .error msg state
           | .ok expr s''' =>
             parseSelectTrailing columns fromTable (some expr) s'''
         | _ =>
