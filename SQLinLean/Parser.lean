@@ -112,12 +112,23 @@ mutual
         | _ => ParserResult.ok (.Identifier name) s'
       | some .LeftParen =>
         let s' := s.advance
-        match parseOr s' with
-        | ParserResult.error msg state => ParserResult.error msg state
-        | ParserResult.ok expr s'' =>
-          match expect .RightParen s'' with
+        -- Check if it's a subquery (SELECT ...)
+        match s'.peek with
+        | some (.Keyword .SELECT) =>
+          match parseSubquerySelect s' with
           | ParserResult.error msg state => ParserResult.error msg state
-          | ParserResult.ok _ s''' => ParserResult.ok expr s'''
+          | ParserResult.ok stmt s'' =>
+            match expect .RightParen s'' with
+            | ParserResult.error msg state => ParserResult.error msg state
+            | ParserResult.ok _ s''' => ParserResult.ok (.Subquery stmt) s'''
+        | _ =>
+          -- Regular parenthesized expression
+          match parseOr s' with
+          | ParserResult.error msg state => ParserResult.error msg state
+          | ParserResult.ok expr s'' =>
+            match expect .RightParen s'' with
+            | ParserResult.error msg state => ParserResult.error msg state
+            | ParserResult.ok _ s''' => ParserResult.ok expr s'''
       | some t => ParserResult.error s!"Unexpected token in expression: {repr t}" s
       | none => ParserResult.error "Unexpected EOF in expression" s
 
@@ -184,27 +195,238 @@ mutual
         | _ => ParserResult.error "Expected NULL or NOT after IS" s''
       | _ => ParserResult.ok expr s'
 
-  -- Parse IN list: (expr, expr, ...)
-  partial def parseInList (s : ParserState) : ParserResult (List Expr) :=
-    let rec parseExprList (state : ParserState) : ParserResult (List Expr) :=
-      match parseOr state with
-      | ParserResult.error msg st => ParserResult.error msg st
-      | ParserResult.ok expr st =>
-        match st.peek with
-        | some .Comma =>
-          match parseExprList (st.advance) with
-          | ParserResult.error msg st' => ParserResult.error msg st'
-          | ParserResult.ok rest st' => ParserResult.ok (expr :: rest) st'
-        | _ => ParserResult.ok [expr] st
+  -- Parse column list for subquery SELECT
+  partial def parseSubqueryColumns (s : ParserState) : ParserResult (List SelectItem) :=
+    let rec loop (state : ParserState) : ParserResult (List SelectItem) :=
+      match state.peek with
+      | some .Star =>
+        let item := SelectItem.AllColumns
+        let state' := state.advance
+        match state'.peek with
+        | some .Comma => match loop (state'.advance) with
+          | .ok rest st => .ok (item :: rest) st
+          | .error msg st => .error msg st
+        | _ => .ok [item] state'
+      | _ =>
+        match parseOr state with
+        | .error msg st => .error msg st
+        | .ok expr st =>
+          -- Check for alias (AS name or just name)
+          let (alias, st') := match st.peek with
+            | some (.Keyword .AS) =>
+              let st'' := st.advance
+              match st''.peek with
+              | some (.Identifier name) => (some name, st''.advance)
+              | _ => (none, st)
+            | some (.Identifier name) => (some name, st.advance)
+            | _ => (none, st)
+          let item := SelectItem.Expr expr alias
+          match st'.peek with
+          | some .Comma => match loop (st'.advance) with
+            | .ok rest st'' => .ok (item :: rest) st''
+            | .error msg st'' => .error msg st''
+          | _ => .ok [item] st'
+    loop s
+
+  -- Parse simple table reference for subquery (table [AS alias])
+  partial def parseSubqueryTableSimple (s : ParserState) : ParserResult TableRef :=
+    match s.peek with
+    | some (.Identifier name) =>
+      let s' := s.advance
+      let (alias, s'') := match s'.peek with
+        | some (.Keyword .AS) =>
+          let s'' := s'.advance
+          match s''.peek with
+          | some (.Identifier a) => (some a, s''.advance)
+          | _ => (none, s')
+        | some (.Identifier a) => (some a, s'.advance)
+        | _ => (none, s')
+      .ok (.Table name alias) s''
+    | _ => .error "Expected table name in subquery" s
+
+  -- Try to parse JOIN type keyword in subquery context
+  partial def tryParseSubqueryJoinType (s : ParserState) : Option JoinType × ParserState :=
+    match s.peek with
+    | some (.Keyword .INNER) =>
+      let s' := s.advance
+      match s'.peek with
+      | some (.Keyword .JOIN) => (some .Inner, s'.advance)
+      | _ => (none, s)
+    | some (.Keyword .LEFT) =>
+      let s' := s.advance
+      match s'.peek with
+      | some (.Keyword .OUTER) =>
+        let s'' := s'.advance
+        match s''.peek with
+        | some (.Keyword .JOIN) => (some .Left, s''.advance)
+        | _ => (none, s)
+      | some (.Keyword .JOIN) => (some .Left, s'.advance)
+      | _ => (none, s)
+    | some (.Keyword .RIGHT) =>
+      let s' := s.advance
+      match s'.peek with
+      | some (.Keyword .OUTER) =>
+        let s'' := s'.advance
+        match s''.peek with
+        | some (.Keyword .JOIN) => (some .Right, s''.advance)
+        | _ => (none, s)
+      | some (.Keyword .JOIN) => (some .Right, s'.advance)
+      | _ => (none, s)
+    | some (.Keyword .JOIN) => (some .Inner, s.advance)
+    | _ => (none, s)
+
+  -- Parse table reference with JOINs for subquery
+  partial def parseSubqueryTable (s : ParserState) : ParserResult TableRef :=
+    match parseSubqueryTableSimple s with
+    | .error msg state => .error msg state
+    | .ok left sAfterLeft =>
+      -- Try to parse JOINs
+      let rec parseJoins (currentRef : TableRef) (state : ParserState) : ParserResult TableRef :=
+        let (joinType, sAfterJoinKw) := tryParseSubqueryJoinType state
+        match joinType with
+        | none => .ok currentRef state
+        | some jt =>
+          match parseSubqueryTableSimple sAfterJoinKw with
+          | .error msg st => .error msg st
+          | .ok rightTable sAfterRight =>
+            match sAfterRight.peek with
+            | some (.Keyword .ON) =>
+              match parseOr (sAfterRight.advance) with
+              | .error msg st => .error msg st
+              | .ok cond sAfterCond =>
+                let joined := TableRef.Join currentRef jt rightTable cond
+                parseJoins joined sAfterCond
+            | _ => .error "Expected ON after JOIN" sAfterRight
+      parseJoins left sAfterLeft
+
+  -- Parse a simple SELECT subquery (covers most common patterns)
+  partial def parseSubquerySelect (s : ParserState) : ParserResult Statement :=
+    match s.peek with
+    | some (.Keyword .SELECT) =>
+      let s' := s.advance
+      -- Check for DISTINCT
+      let (distinct, s'') := match s'.peek with
+        | some (.Keyword .DISTINCT) => (true, s'.advance)
+        | _ => (false, s')
+      -- Parse columns
+      match parseSubqueryColumns s'' with
+      | .error msg state => .error msg state
+      | .ok columns s''' =>
+        -- Parse FROM
+        match s'''.peek with
+        | some (.Keyword .FROM) =>
+          match parseSubqueryTable (s'''.advance) with
+          | .error msg state => .error msg state
+          | .ok table sAfterFrom =>
+            -- Parse optional WHERE
+            let (whereClause, sAfterWhere) := match sAfterFrom.peek with
+              | some (.Keyword .WHERE) =>
+                match parseOr (sAfterFrom.advance) with
+                | .ok expr st => (some expr, st)
+                | .error _ _ => (none, sAfterFrom)
+              | _ => (none, sAfterFrom)
+            -- Parse optional GROUP BY
+            let (groupBy, sAfterGroup) := match sAfterWhere.peek with
+              | some (.Keyword .GROUP) =>
+                let sg := sAfterWhere.advance
+                match sg.peek with
+                | some (.Keyword .BY) =>
+                  let rec parseGroupExprs (state : ParserState) : List Expr × ParserState :=
+                    match parseOr state with
+                    | .ok expr st =>
+                      match st.peek with
+                      | some .Comma =>
+                        let (rest, st') := parseGroupExprs (st.advance)
+                        (expr :: rest, st')
+                      | _ => ([expr], st)
+                    | .error _ _ => ([], state)
+                  parseGroupExprs (sg.advance)
+                | _ => ([], sAfterWhere)
+              | _ => ([], sAfterWhere)
+            -- Parse optional HAVING
+            let (having, sAfterHaving) := match sAfterGroup.peek with
+              | some (.Keyword .HAVING) =>
+                match parseOr (sAfterGroup.advance) with
+                | .ok expr st => (some expr, st)
+                | .error _ _ => (none, sAfterGroup)
+              | _ => (none, sAfterGroup)
+            -- Parse optional ORDER BY
+            let (orderBy, sAfterOrder) := match sAfterHaving.peek with
+              | some (.Keyword .ORDER) =>
+                let so := sAfterHaving.advance
+                match so.peek with
+                | some (.Keyword .BY) =>
+                  let rec parseOrderExprs (state : ParserState) : List (Expr × Bool) × ParserState :=
+                    match parseOr state with
+                    | .ok expr st =>
+                      let (asc, st') := match st.peek with
+                        | some (.Keyword .ASC) => (true, st.advance)
+                        | some (.Keyword .DESC) => (false, st.advance)
+                        | _ => (true, st)
+                      match st'.peek with
+                      | some .Comma =>
+                        let (rest, st'') := parseOrderExprs (st'.advance)
+                        ((expr, asc) :: rest, st'')
+                      | _ => ([(expr, asc)], st')
+                    | .error _ _ => ([], state)
+                  parseOrderExprs (so.advance)
+                | _ => ([], sAfterHaving)
+              | _ => ([], sAfterHaving)
+            -- Parse optional LIMIT
+            let (limit, sAfterLimit) := match sAfterOrder.peek with
+              | some (.Keyword .LIMIT) =>
+                let sl := sAfterOrder.advance
+                match sl.peek with
+                | some (.Literal (.Integer n)) => (some n.toNat, sl.advance)
+                | _ => (none, sAfterOrder)
+              | _ => (none, sAfterOrder)
+            -- Parse optional OFFSET
+            let (offset, sAfterOffset) := match sAfterLimit.peek with
+              | some (.Keyword .OFFSET) =>
+                let so := sAfterLimit.advance
+                match so.peek with
+                | some (.Literal (.Integer n)) => (some n.toNat, so.advance)
+                | _ => (none, sAfterLimit)
+              | _ => (none, sAfterLimit)
+            .ok (.Select distinct columns (some table) whereClause groupBy having orderBy limit offset) sAfterOffset
+        | _ =>
+          -- SELECT without FROM
+          .ok (.Select distinct columns none none [] none [] none none) s'''
+    | _ => .error "Expected SELECT in subquery" s
+
+  -- Parse IN values or subquery: (SELECT ...) or (expr, expr, ...)
+  -- Returns either In or InSubquery expression
+  partial def parseInOrSubquery (left : Expr) (negated : Bool) (s : ParserState) : ParserResult Expr :=
     match expect .LeftParen s with
-    | ParserResult.error msg state => ParserResult.error msg state
-    | ParserResult.ok _ s' =>
-      match parseExprList s' with
-      | ParserResult.error msg state => ParserResult.error msg state
-      | ParserResult.ok values s'' =>
-        match expect .RightParen s'' with
-        | ParserResult.error msg state => ParserResult.error msg state
-        | ParserResult.ok _ s''' => ParserResult.ok values s'''
+    | .error msg state => .error msg state
+    | .ok _ s' =>
+      match s'.peek with
+      | some (.Keyword .SELECT) =>
+        -- Parse subquery
+        match parseSubquerySelect s' with
+        | .error msg state => .error msg state
+        | .ok stmt s'' =>
+          match expect .RightParen s'' with
+          | .error msg state => .error msg state
+          | .ok _ s''' => .ok (.InSubquery left stmt negated) s'''
+      | _ =>
+        -- Parse expression list
+        let rec parseExprList (state : ParserState) : ParserResult (List Expr) :=
+          match parseOr state with
+          | .error msg st => .error msg st
+          | .ok expr st =>
+            match st.peek with
+            | some .Comma =>
+              match parseExprList (st.advance) with
+              | .error msg st' => .error msg st'
+              | .ok rest st' => .ok (expr :: rest) st'
+            | _ => .ok [expr] st
+        match parseExprList s' with
+        | .error msg state => .error msg state
+        | .ok values s'' =>
+          match expect .RightParen s'' with
+          | .error msg state => .error msg state
+          | .ok _ s''' => .ok (.In left values negated) s'''
 
   -- Parse BETWEEN: expr BETWEEN low AND high
   partial def parseBetween (left : Expr) (negated : Bool) (s : ParserState) : ParserResult Expr :=
@@ -239,10 +461,7 @@ mutual
         | ParserResult.error msg state => ParserResult.error msg state
         | ParserResult.ok right s''' => ParserResult.ok (.BinaryOp left .Like right) s'''
       | some (.Keyword .IN) =>
-        let s'' := s'.advance
-        match parseInList s'' with
-        | ParserResult.error msg state => ParserResult.error msg state
-        | ParserResult.ok values s''' => ParserResult.ok (.In left values false) s'''
+        parseInOrSubquery left false (s'.advance)
       | some (.Keyword .BETWEEN) =>
         let s'' := s'.advance
         parseBetween left false s''
@@ -251,10 +470,7 @@ mutual
         let s'' := s'.advance
         match s''.peek with
         | some (.Keyword .IN) =>
-          let s''' := s''.advance
-          match parseInList s''' with
-          | ParserResult.error msg state => ParserResult.error msg state
-          | ParserResult.ok values s'''' => ParserResult.ok (.In left values true) s''''
+          parseInOrSubquery left true (s''.advance)
         | some (.Keyword .BETWEEN) =>
           let s''' := s''.advance
           parseBetween left true s'''
@@ -395,7 +611,8 @@ def tryParseJoinType (s : ParserState) : Option JoinType × ParserState :=
   | _ => (none, s)
 
 -- Parse table reference with optional joins
--- Handles: table [AS alias] [[INNER|LEFT|RIGHT|FULL] [OUTER] JOIN table [AS alias] ON expr]*
+-- Handles: table [AS alias] [[INNER|LEFT|RIGHT|FULL] [OUTER] JOIN table [AS alias] [ON expr]]*
+-- Also handles non-standard multi-JOIN syntax: JOIN t1 JOIN t2 ON (combined condition)
 partial def parseTableRef (s : ParserState) : ParserResult TableRef :=
   match parseTableRefSimple s with
   | .error msg state => .error msg state
@@ -416,7 +633,17 @@ where
           | .ok condition s''' =>
             let joinedTable := TableRef.Join leftTable jt rightTable condition
             parseTableRefJoins joinedTable s'''
-        | _ => .error "Expected ON after JOIN table" s''
+        | _ =>
+          -- No ON clause - check if there's another JOIN (multi-JOIN syntax)
+          let (nextJoinType, _) := tryParseJoinType s''
+          match nextJoinType with
+          | some _ =>
+            -- Another JOIN follows, use a placeholder TRUE condition for now
+            let joinedTable := TableRef.Join leftTable jt rightTable (.Literal (.Integer 1))
+            parseTableRefJoins joinedTable s''
+          | none =>
+            -- No more joins and no ON - error for standard case
+            .error "Expected ON after JOIN table" s''
 
 -- Parse ORDER BY item: expr [ASC|DESC]
 def parseOrderByItem (s : ParserState) : ParserResult (Expr × Bool) :=
