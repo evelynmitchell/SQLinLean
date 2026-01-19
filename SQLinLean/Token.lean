@@ -42,6 +42,10 @@ inductive Keyword where
   | MIN
   | MAX
   | DISTINCT
+  | IS
+  | LIKE
+  | IN
+  | BETWEEN
   deriving Repr, BEq, DecidableEq, Nonempty
 
 -- SQL Operators
@@ -58,6 +62,7 @@ inductive Operator where
   | Divide         -- /
   | And            -- AND logical operator
   | Or             -- OR logical operator
+  | Like           -- LIKE pattern matching
   deriving Repr, BEq, DecidableEq, Nonempty
 
 -- SQL Literal types
@@ -125,6 +130,10 @@ def Keyword.toString : Keyword → String
   | .MIN => "MIN"
   | .MAX => "MAX"
   | .DISTINCT => "DISTINCT"
+  | .IS => "IS"
+  | .LIKE => "LIKE"
+  | .IN => "IN"
+  | .BETWEEN => "BETWEEN"
 
 def Keyword.fromString? (s : String) : Option Keyword :=
   match s.toUpper with
@@ -167,6 +176,10 @@ def Keyword.fromString? (s : String) : Option Keyword :=
   | "MIN" => some .MIN
   | "MAX" => some .MAX
   | "DISTINCT" => some .DISTINCT
+  | "IS" => some .IS
+  | "LIKE" => some .LIKE
+  | "IN" => some .IN
+  | "BETWEEN" => some .BETWEEN
   | _ => none
 
 end SQLinLean

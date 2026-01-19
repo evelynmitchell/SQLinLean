@@ -34,11 +34,11 @@ Based on ROADMAP.md Phase 1 and expected corpus failures:
 ### Medium Priority
 - [ ] UPDATE statement parser - AST exists
 - [ ] CREATE TABLE parser - AST exists
-- [ ] DISTINCT keyword
-- [ ] IN operator
-- [ ] BETWEEN operator
-- [ ] LIKE operator
-- [ ] IS NULL / IS NOT NULL
+- [x] DISTINCT keyword
+- [x] IN operator
+- [x] BETWEEN operator
+- [x] LIKE operator
+- [x] IS NULL / IS NOT NULL
 
 ### Lower Priority
 - [ ] Subqueries

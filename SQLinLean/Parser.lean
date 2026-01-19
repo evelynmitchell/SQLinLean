@@ -161,9 +161,64 @@ mutual
     | ParserResult.error msg st => ParserResult.error msg st
     | ParserResult.ok left st => loop left st
 
-  -- Parse comparison expressions: =, <>, <, >, <=, >=
-  partial def parseComparison (s : ParserState) : ParserResult Expr :=
+  -- Parse IS NULL / IS NOT NULL (postfix unary operator)
+  partial def parseIsNull (s : ParserState) : ParserResult Expr :=
     match parseAdditive s with
+    | ParserResult.error msg state => ParserResult.error msg state
+    | ParserResult.ok expr s' =>
+      match s'.peek with
+      | some (.Keyword .IS) =>
+        let s'' := s'.advance
+        match s''.peek with
+        | some (.Keyword .NOT) =>
+          let s''' := s''.advance
+          match s'''.peek with
+          | some (.Keyword .NULL) =>
+            ParserResult.ok (.IsNull expr true) (s'''.advance)
+          | _ => ParserResult.error "Expected NULL after IS NOT" s'''
+        | some (.Keyword .NULL) =>
+          ParserResult.ok (.IsNull expr false) (s''.advance)
+        | _ => ParserResult.error "Expected NULL or NOT after IS" s''
+      | _ => ParserResult.ok expr s'
+
+  -- Parse IN list: (expr, expr, ...)
+  partial def parseInList (s : ParserState) : ParserResult (List Expr) :=
+    let rec parseExprList (state : ParserState) : ParserResult (List Expr) :=
+      match parseOr state with
+      | ParserResult.error msg st => ParserResult.error msg st
+      | ParserResult.ok expr st =>
+        match st.peek with
+        | some .Comma =>
+          match parseExprList (st.advance) with
+          | ParserResult.error msg st' => ParserResult.error msg st'
+          | ParserResult.ok rest st' => ParserResult.ok (expr :: rest) st'
+        | _ => ParserResult.ok [expr] st
+    match expect .LeftParen s with
+    | ParserResult.error msg state => ParserResult.error msg state
+    | ParserResult.ok _ s' =>
+      match parseExprList s' with
+      | ParserResult.error msg state => ParserResult.error msg state
+      | ParserResult.ok values s'' =>
+        match expect .RightParen s'' with
+        | ParserResult.error msg state => ParserResult.error msg state
+        | ParserResult.ok _ s''' => ParserResult.ok values s'''
+
+  -- Parse BETWEEN: expr BETWEEN low AND high
+  partial def parseBetween (left : Expr) (negated : Bool) (s : ParserState) : ParserResult Expr :=
+    match parseIsNull s with
+    | ParserResult.error msg state => ParserResult.error msg state
+    | ParserResult.ok low s' =>
+      match s'.peek with
+      | some (.Keyword .AND) =>
+        let s'' := s'.advance
+        match parseIsNull s'' with
+        | ParserResult.error msg state => ParserResult.error msg state
+        | ParserResult.ok high s''' => ParserResult.ok (.Between left low high negated) s'''
+      | _ => ParserResult.error "Expected AND in BETWEEN expression" s'
+
+  -- Parse comparison expressions: =, <>, <, >, <=, >=, LIKE, IN, NOT IN, BETWEEN, NOT BETWEEN
+  partial def parseComparison (s : ParserState) : ParserResult Expr :=
+    match parseIsNull s with
     | ParserResult.error msg state => ParserResult.error msg state
     | ParserResult.ok left s' =>
       match s'.peek with
@@ -171,10 +226,36 @@ mutual
         match op with
         | .Equals | .NotEquals | .LessThan | .GreaterThan | .LessOrEqual | .GreaterOrEqual =>
           let s'' := s'.advance
-          match parseAdditive s'' with
+          match parseIsNull s'' with
           | ParserResult.error msg state => ParserResult.error msg state
           | ParserResult.ok right s''' => ParserResult.ok (.BinaryOp left op right) s'''
         | _ => ParserResult.ok left s'
+      | some (.Keyword .LIKE) =>
+        let s'' := s'.advance
+        match parseIsNull s'' with
+        | ParserResult.error msg state => ParserResult.error msg state
+        | ParserResult.ok right s''' => ParserResult.ok (.BinaryOp left .Like right) s'''
+      | some (.Keyword .IN) =>
+        let s'' := s'.advance
+        match parseInList s'' with
+        | ParserResult.error msg state => ParserResult.error msg state
+        | ParserResult.ok values s''' => ParserResult.ok (.In left values false) s'''
+      | some (.Keyword .BETWEEN) =>
+        let s'' := s'.advance
+        parseBetween left false s''
+      | some (.Keyword .NOT) =>
+        -- Check for NOT IN or NOT BETWEEN
+        let s'' := s'.advance
+        match s''.peek with
+        | some (.Keyword .IN) =>
+          let s''' := s''.advance
+          match parseInList s''' with
+          | ParserResult.error msg state => ParserResult.error msg state
+          | ParserResult.ok values s'''' => ParserResult.ok (.In left values true) s''''
+        | some (.Keyword .BETWEEN) =>
+          let s''' := s''.advance
+          parseBetween left true s'''
+        | _ => ParserResult.ok left s'  -- Not NOT IN/BETWEEN, return left unchanged
       | _ => ParserResult.ok left s'
 
   -- Parse NOT expression (unary prefix operator)
@@ -406,7 +487,7 @@ def parseHaving (s : ParserState) : ParserResult (Option Expr) :=
   | _ => .ok none s  -- No HAVING clause
 
 -- Helper to parse the trailing clauses (GROUP BY, HAVING, ORDER BY, LIMIT, OFFSET) after WHERE
-def parseSelectTrailing (columns : List SelectItem) (fromTable : Option TableRef)
+def parseSelectTrailing (distinct : Bool) (columns : List SelectItem) (fromTable : Option TableRef)
     (whereClause : Option Expr) (s : ParserState) : ParserResult Statement :=
   match parseGroupBy s with
   | .error msg state => .error msg state
@@ -423,20 +504,24 @@ def parseSelectTrailing (columns : List SelectItem) (fromTable : Option TableRef
           match parseOffset s'''' with
           | .error msg state => .error msg state
           | .ok offset s''''' =>
-            .ok (.Select columns fromTable whereClause groupBy having orderBy limit offset) s'''''
+            .ok (.Select distinct columns fromTable whereClause groupBy having orderBy limit offset) s'''''
 
 -- Parse SELECT statement
 def parseSelect (s : ParserState) : ParserResult Statement :=
   match expectKeyword .SELECT s with
   | .error msg state => .error msg state
   | .ok _ s' =>
-    match parseList parseSelectItem s' with
+    -- Check for DISTINCT keyword
+    let (distinct, s'') := match s'.peek with
+      | some (.Keyword .DISTINCT) => (true, s'.advance)
+      | _ => (false, s')
+    match parseList parseSelectItem s'' with
     | .error msg state => .error msg state
-    | .ok columns s'' =>
+    | .ok columns s''' =>
       -- Parse optional FROM clause with optional JOINs
-      match s''.peek with
+      match s'''.peek with
       | some (.Keyword .FROM) =>
-        match parseTableRef (s''.advance) with
+        match parseTableRef (s'''.advance) with
         | .error msg state => .error msg state
         | .ok tableRef sAfterFrom =>
           let fromTable := some tableRef
@@ -446,20 +531,20 @@ def parseSelect (s : ParserState) : ParserResult Statement :=
             match parseExpr (sAfterFrom.advance) with
             | .error msg state => .error msg state
             | .ok expr sAfterWhere =>
-              parseSelectTrailing columns fromTable (some expr) sAfterWhere
+              parseSelectTrailing distinct columns fromTable (some expr) sAfterWhere
           | _ =>
-            parseSelectTrailing columns fromTable none sAfterFrom
+            parseSelectTrailing distinct columns fromTable none sAfterFrom
       | _ =>
         let fromTable := (none : Option TableRef)
         -- Parse optional WHERE clause when there is no FROM
-        match s''.peek with
+        match s'''.peek with
         | some (.Keyword .WHERE) =>
-          match parseExpr (s''.advance) with
+          match parseExpr (s'''.advance) with
           | .error msg state => .error msg state
-          | .ok expr s''' =>
-            parseSelectTrailing columns fromTable (some expr) s'''
+          | .ok expr s'''' =>
+            parseSelectTrailing distinct columns fromTable (some expr) s''''
         | _ =>
-          parseSelectTrailing columns fromTable none s''
+          parseSelectTrailing distinct columns fromTable none s'''
 
 -- Parse INSERT statement
 def parseInsert (s : ParserState) : ParserResult Statement :=

@@ -14,16 +14,20 @@ Create a feature branch and set up for a new development session.
    git pull --rebase
    ```
 
-3. **Create feature branch:**
+3. **Set up development environment:**
+   - Run `bash setup_codespaces.sh` to ensure Lean toolchain is installed
+   - This installs elan, Lean4, and builds the project
+
+4. **Create feature branch:**
    - Ask user for a brief description of the work (e.g., "flyio deployment")
    - Generate branch name: `claude/{description-slug}-{random-5-chars}`
    - Create and checkout: `git checkout -b {branch-name}`
 
-4. **Confirm branch created:**
+5. **Confirm branch created:**
    - Show current branch: `git branch --show-current`
    - Remind user that all commits will go to this branch
 
-5. **Initialize session summary:**
+6. **Initialize session summary:**
    - Run `/session-summary` to create `Summary/summary{YYYYMMDD}.{n}.md`
    - Record the goal and initial planning notes
    - This file will be updated throughout the session with progress, commits, and reflections
