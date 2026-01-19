@@ -22,6 +22,9 @@ inductive Expr where
   | BinaryOp (left : Expr) (op : Operator) (right : Expr)
   | Not (expr : Expr)  -- NOT unary operator
   | Aggregate (func : AggregateFunc) (arg : Expr) (distinct : Bool)  -- COUNT(x), SUM(DISTINCT x), etc.
+  | IsNull (expr : Expr) (negated : Bool)  -- IS NULL (negated=false) or IS NOT NULL (negated=true)
+  | In (expr : Expr) (values : List Expr) (negated : Bool)  -- IN (negated=false) or NOT IN (negated=true)
+  | Between (expr : Expr) (low : Expr) (high : Expr) (negated : Bool)  -- BETWEEN low AND high
   deriving Repr, BEq, Nonempty
 
 -- Column selection in SELECT
@@ -47,6 +50,7 @@ inductive TableRef where
 -- SQL Statement types
 inductive Statement where
   | Select
+      (distinct : Bool)               -- SELECT DISTINCT
       (columns : List SelectItem)
       (fromTable : Option TableRef)
       (whereClause : Option Expr)
