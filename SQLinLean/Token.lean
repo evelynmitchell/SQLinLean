@@ -36,6 +36,12 @@ inductive Keyword where
   | OFFSET
   | ASC
   | DESC
+  | COUNT
+  | SUM
+  | AVG
+  | MIN
+  | MAX
+  | DISTINCT
   deriving Repr, BEq, DecidableEq, Nonempty
 
 -- SQL Operators
@@ -113,6 +119,12 @@ def Keyword.toString : Keyword → String
   | .OFFSET => "OFFSET"
   | .ASC => "ASC"
   | .DESC => "DESC"
+  | .COUNT => "COUNT"
+  | .SUM => "SUM"
+  | .AVG => "AVG"
+  | .MIN => "MIN"
+  | .MAX => "MAX"
+  | .DISTINCT => "DISTINCT"
 
 def Keyword.fromString? (s : String) : Option Keyword :=
   match s.toUpper with
@@ -149,6 +161,12 @@ def Keyword.fromString? (s : String) : Option Keyword :=
   | "OFFSET" => some .OFFSET
   | "ASC" => some .ASC
   | "DESC" => some .DESC
+  | "COUNT" => some .COUNT
+  | "SUM" => some .SUM
+  | "AVG" => some .AVG
+  | "MIN" => some .MIN
+  | "MAX" => some .MAX
+  | "DISTINCT" => some .DISTINCT
   | _ => none
 
 end SQLinLean

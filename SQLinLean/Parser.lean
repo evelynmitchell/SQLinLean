@@ -53,31 +53,70 @@ def parseIdentifier (s : ParserState) : ParserResult String :=
 
 -- Expression parsing with mutual recursion and proper precedence
 mutual
-  -- Parse a primary expression (literals, identifiers, parenthesized expressions)
-  partial def parsePrimary (s : ParserState) : ParserResult Expr :=
+  -- Try to parse an aggregate function keyword, returns the function type if found
+  partial def tryParseAggregateFunc (s : ParserState) : Option AggregateFunc × ParserState :=
     match s.peek with
-    | some (.Literal lit) => ParserResult.ok (.Literal lit) (s.advance)
-    | some (.Keyword .NULL) => ParserResult.ok (.Literal .Null) (s.advance)
-    | some .Star => ParserResult.ok .Star (s.advance)
-    | some (.Identifier name) =>
-      let s' := s.advance
-      match s'.peek with
-      | some .Dot =>
-        let s'' := s'.advance
-        match parseIdentifier s'' with
-        | ParserResult.ok colName s''' => ParserResult.ok (.QualifiedIdentifier name colName) s'''
+    | some (.Keyword .COUNT) => (some .Count, s.advance)
+    | some (.Keyword .SUM) => (some .Sum, s.advance)
+    | some (.Keyword .AVG) => (some .Avg, s.advance)
+    | some (.Keyword .MIN) => (some .Min, s.advance)
+    | some (.Keyword .MAX) => (some .Max, s.advance)
+    | _ => (none, s)
+
+  -- Parse aggregate function: FUNC ( [DISTINCT] expr )
+  partial def parseAggregate (func : AggregateFunc) (s : ParserState) : ParserResult Expr :=
+    match expect .LeftParen s with
+    | .error msg state => .error msg state
+    | .ok _ s' =>
+      -- Check for DISTINCT
+      let (distinct, s'') := match s'.peek with
+        | some (.Keyword .DISTINCT) => (true, s'.advance)
+        | _ => (false, s')
+      -- Parse the argument expression (can be * for COUNT)
+      match s''.peek with
+      | some .Star =>
+        let s''' := s''.advance
+        match expect .RightParen s''' with
+        | .error msg state => .error msg state
+        | .ok _ s'''' => .ok (.Aggregate func .Star distinct) s''''
+      | _ =>
+        match parseOr s'' with
+        | .error msg state => .error msg state
+        | .ok expr s''' =>
+          match expect .RightParen s''' with
+          | .error msg state => .error msg state
+          | .ok _ s'''' => .ok (.Aggregate func expr distinct) s''''
+
+  -- Parse a primary expression (literals, identifiers, aggregates, parenthesized expressions)
+  partial def parsePrimary (s : ParserState) : ParserResult Expr :=
+    -- First check for aggregate functions
+    let (aggFunc, s') := tryParseAggregateFunc s
+    match aggFunc with
+    | some func => parseAggregate func s'
+    | none =>
+      match s.peek with
+      | some (.Literal lit) => ParserResult.ok (.Literal lit) (s.advance)
+      | some (.Keyword .NULL) => ParserResult.ok (.Literal .Null) (s.advance)
+      | some .Star => ParserResult.ok .Star (s.advance)
+      | some (.Identifier name) =>
+        let s' := s.advance
+        match s'.peek with
+        | some .Dot =>
+          let s'' := s'.advance
+          match parseIdentifier s'' with
+          | ParserResult.ok colName s''' => ParserResult.ok (.QualifiedIdentifier name colName) s'''
+          | ParserResult.error msg state => ParserResult.error msg state
+        | _ => ParserResult.ok (.Identifier name) s'
+      | some .LeftParen =>
+        let s' := s.advance
+        match parseOr s' with
         | ParserResult.error msg state => ParserResult.error msg state
-      | _ => ParserResult.ok (.Identifier name) s'
-    | some .LeftParen =>
-      let s' := s.advance
-      match parseOr s' with
-      | ParserResult.error msg state => ParserResult.error msg state
-      | ParserResult.ok expr s'' =>
-        match expect .RightParen s'' with
-        | ParserResult.error msg state => ParserResult.error msg state
-        | ParserResult.ok _ s''' => ParserResult.ok expr s'''
-    | some t => ParserResult.error s!"Unexpected token in expression: {repr t}" s
-    | none => ParserResult.error "Unexpected EOF in expression" s
+        | ParserResult.ok expr s'' =>
+          match expect .RightParen s'' with
+          | ParserResult.error msg state => ParserResult.error msg state
+          | ParserResult.ok _ s''' => ParserResult.ok expr s'''
+      | some t => ParserResult.error s!"Unexpected token in expression: {repr t}" s
+      | none => ParserResult.error "Unexpected EOF in expression" s
 
   -- Parse multiplicative expressions: *, /
   partial def parseMultiplicative (s : ParserState) : ParserResult Expr :=
@@ -344,19 +383,47 @@ def parseOffset (s : ParserState) : ParserResult (Option Nat) :=
     | .ok n s'' => .ok (some n) s''
   | _ => .ok none s
 
--- Helper to parse the trailing clauses (ORDER BY, LIMIT, OFFSET) after WHERE
+-- Parse GROUP BY clause: GROUP BY expr [, ...]
+partial def parseGroupBy (s : ParserState) : ParserResult (List Expr) :=
+  match s.peek with
+  | some (.Keyword .GROUP) =>
+    let s' := s.advance
+    match s'.peek with
+    | some (.Keyword .BY) =>
+      let s'' := s'.advance
+      parseList parseExpr s''
+    | _ => .error "Expected BY after GROUP" s'
+  | _ => .ok [] s  -- No GROUP BY clause
+
+-- Parse HAVING clause: HAVING expr
+def parseHaving (s : ParserState) : ParserResult (Option Expr) :=
+  match s.peek with
+  | some (.Keyword .HAVING) =>
+    let s' := s.advance
+    match parseExpr s' with
+    | .error msg state => .error msg state
+    | .ok expr s'' => .ok (some expr) s''
+  | _ => .ok none s  -- No HAVING clause
+
+-- Helper to parse the trailing clauses (GROUP BY, HAVING, ORDER BY, LIMIT, OFFSET) after WHERE
 def parseSelectTrailing (columns : List SelectItem) (fromTable : Option TableRef)
     (whereClause : Option Expr) (s : ParserState) : ParserResult Statement :=
-  match parseOrderBy s with
+  match parseGroupBy s with
   | .error msg state => .error msg state
-  | .ok orderBy s' =>
-    match parseLimit s' with
+  | .ok groupBy s' =>
+    match parseHaving s' with
     | .error msg state => .error msg state
-    | .ok limit s'' =>
-      match parseOffset s'' with
+    | .ok having s'' =>
+      match parseOrderBy s'' with
       | .error msg state => .error msg state
-      | .ok offset s''' =>
-        .ok (.Select columns fromTable whereClause orderBy limit offset) s'''
+      | .ok orderBy s''' =>
+        match parseLimit s''' with
+        | .error msg state => .error msg state
+        | .ok limit s'''' =>
+          match parseOffset s'''' with
+          | .error msg state => .error msg state
+          | .ok offset s''''' =>
+            .ok (.Select columns fromTable whereClause groupBy having orderBy limit offset) s'''''
 
 -- Parse SELECT statement
 def parseSelect (s : ParserState) : ParserResult Statement :=

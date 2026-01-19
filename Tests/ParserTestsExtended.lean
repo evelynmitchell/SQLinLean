@@ -14,7 +14,7 @@ def testSelectWithAlias : IO Unit := do
       IO.println s!"FAIL: testSelectWithAlias - {err}"
   | Sum.inr stmt =>
       match stmt with
-      | Statement.Select [SelectItem.Expr (Expr.Identifier "name") (some "user_name")] _ _ _ _ _ =>
+      | Statement.Select [SelectItem.Expr (Expr.Identifier "name") (some "user_name")] _ _ _ _ _ _ _ =>
           IO.println "PASS: testSelectWithAlias"
       | _ => 
           IO.println s!"FAIL: testSelectWithAlias - Unexpected parse result: {repr stmt}"
@@ -27,7 +27,7 @@ def testSelectTableAlias : IO Unit := do
   | Sum.inr stmt =>
       match stmt with
       | Statement.Select [SelectItem.Expr (Expr.QualifiedIdentifier "u" "name") none] 
-                        (some (TableRef.Table "users" (some "u"))) none _ _ _ =>
+                        (some (TableRef.Table "users" (some "u"))) none _ _ _ _ _ =>
           IO.println "PASS: testSelectTableAlias"
       | _ => 
           IO.println s!"FAIL: testSelectTableAlias - Unexpected parse result: {repr stmt}"
@@ -39,7 +39,7 @@ def testSelectOrderBy : IO Unit := do
       IO.println s!"FAIL: testSelectOrderBy - {err}"
   | Sum.inr stmt =>
       match stmt with
-      | Statement.Select _ _ _ orderBy _ _ =>
+      | Statement.Select _ _ _ _ _ orderBy _ _ =>
           if orderBy.length == 1 then
             IO.println "PASS: testSelectOrderBy"
           else
@@ -54,9 +54,9 @@ def testSelectOrderByDesc : IO Unit := do
       IO.println s!"FAIL: testSelectOrderByDesc - {err}"
   | Sum.inr stmt =>
       match stmt with
-      | Statement.Select _ _ _ [(_, false)] _ _ =>
+      | Statement.Select _ _ _ _ _ [(_, false)] _ _ =>
           IO.println "PASS: testSelectOrderByDesc"
-      | Statement.Select _ _ _ orderBy _ _ =>
+      | Statement.Select _ _ _ _ _ orderBy _ _ =>
           IO.println s!"FAIL: testSelectOrderByDesc - Expected DESC (false), got {repr orderBy}"
       | _ =>
           IO.println s!"FAIL: testSelectOrderByDesc - Unexpected parse result: {repr stmt}"
@@ -68,7 +68,7 @@ def testSelectOrderByMultiple : IO Unit := do
       IO.println s!"FAIL: testSelectOrderByMultiple - {err}"
   | Sum.inr stmt =>
       match stmt with
-      | Statement.Select _ _ _ orderBy _ _ =>
+      | Statement.Select _ _ _ _ _ orderBy _ _ =>
           if orderBy.length == 2 then
             IO.println "PASS: testSelectOrderByMultiple"
           else
@@ -83,9 +83,9 @@ def testSelectLimit : IO Unit := do
       IO.println s!"FAIL: testSelectLimit - {err}"
   | Sum.inr stmt =>
       match stmt with
-      | Statement.Select _ _ _ _ (some 10) _ =>
+      | Statement.Select _ _ _ _ _ _ (some 10) _ =>
           IO.println "PASS: testSelectLimit"
-      | Statement.Select _ _ _ _ limit _ =>
+      | Statement.Select _ _ _ _ _ _ limit _ =>
           IO.println s!"FAIL: testSelectLimit - Expected LIMIT 10, got {repr limit}"
       | _ =>
           IO.println s!"FAIL: testSelectLimit - Unexpected parse result: {repr stmt}"
@@ -97,9 +97,9 @@ def testSelectLimitOffset : IO Unit := do
       IO.println s!"FAIL: testSelectLimitOffset - {err}"
   | Sum.inr stmt =>
       match stmt with
-      | Statement.Select _ _ _ _ (some 10) (some 20) =>
+      | Statement.Select _ _ _ _ _ _ (some 10) (some 20) =>
           IO.println "PASS: testSelectLimitOffset"
-      | Statement.Select _ _ _ _ limit offset =>
+      | Statement.Select _ _ _ _ _ _ limit offset =>
           IO.println s!"FAIL: testSelectLimitOffset - Expected LIMIT 10 OFFSET 20, got limit={repr limit}, offset={repr offset}"
       | _ =>
           IO.println s!"FAIL: testSelectLimitOffset - Unexpected parse result: {repr stmt}"
@@ -111,7 +111,7 @@ def testSelectFull : IO Unit := do
       IO.println s!"FAIL: testSelectFull - {err}"
   | Sum.inr stmt =>
       match stmt with
-      | Statement.Select cols (some _) (some _) orderBy (some 10) (some 5) =>
+      | Statement.Select cols (some _) (some _) _ _ orderBy (some 10) (some 5) =>
           if cols.length == 2 && orderBy.length == 1 then
             IO.println "PASS: testSelectFull"
           else
@@ -126,7 +126,7 @@ def testComplexWhere : IO Unit := do
       IO.println s!"FAIL: testComplexWhere - {err}"
   | Sum.inr stmt =>
       match stmt with
-      | Statement.Select _ _ (some _) _ _ _ =>
+      | Statement.Select _ _ (some _) _ _ _ _ _ =>
           IO.println "PASS: testComplexWhere"
       | _ => 
           IO.println s!"FAIL: testComplexWhere - Unexpected parse result: {repr stmt}"
@@ -138,7 +138,7 @@ def testWhereOr : IO Unit := do
       IO.println s!"FAIL: testWhereOr - {err}"
   | Sum.inr stmt =>
       match stmt with
-      | Statement.Select _ _ (some _) _ _ _ =>
+      | Statement.Select _ _ (some _) _ _ _ _ _ =>
           IO.println "PASS: testWhereOr"
       | _ => 
           IO.println s!"FAIL: testWhereOr - Unexpected parse result: {repr stmt}"
@@ -150,7 +150,7 @@ def testWhereNot : IO Unit := do
       IO.println s!"FAIL: testWhereNot - {err}"
   | Sum.inr stmt =>
       match stmt with
-      | Statement.Select _ _ (some (Expr.Not _)) _ _ _ =>
+      | Statement.Select _ _ (some (Expr.Not _)) _ _ _ _ _ =>
           IO.println "PASS: testWhereNot"
       | _ => 
           IO.println s!"FAIL: testWhereNot - Unexpected parse result: {repr stmt}"
@@ -162,7 +162,7 @@ def testWhereString : IO Unit := do
       IO.println s!"FAIL: testWhereString - {err}"
   | Sum.inr stmt =>
       match stmt with
-      | Statement.Select _ _ (some (Expr.BinaryOp _ _ (Expr.Literal (Literal.String "Alice")))) _ _ _ =>
+      | Statement.Select _ _ (some (Expr.BinaryOp _ _ (Expr.Literal (Literal.String "Alice")))) _ _ _ _ _ =>
           IO.println "PASS: testWhereString"
       | _ => 
           IO.println s!"FAIL: testWhereString - Unexpected parse result: {repr stmt}"
@@ -174,7 +174,7 @@ def testWhereNull : IO Unit := do
       IO.println s!"FAIL: testWhereNull - {err}"
   | Sum.inr stmt =>
       match stmt with
-      | Statement.Select _ _ (some (Expr.BinaryOp _ _ (Expr.Literal Literal.Null))) _ _ _ =>
+      | Statement.Select _ _ (some (Expr.BinaryOp _ _ (Expr.Literal Literal.Null))) _ _ _ _ _ =>
           IO.println "PASS: testWhereNull"
       | _ => 
           IO.println s!"FAIL: testWhereNull - Unexpected parse result: {repr stmt}"
@@ -186,7 +186,7 @@ def testParenthesizedExpression : IO Unit := do
       IO.println s!"FAIL: testParenthesizedExpression - {err}"
   | Sum.inr stmt =>
       match stmt with
-      | Statement.Select _ _ (some _) _ _ _ =>
+      | Statement.Select _ _ (some _) _ _ _ _ _ =>
           IO.println "PASS: testParenthesizedExpression"
       | _ => 
           IO.println s!"FAIL: testParenthesizedExpression - Unexpected parse result: {repr stmt}"
@@ -239,7 +239,7 @@ def testSelectWithoutFrom : IO Unit := do
       IO.println s!"FAIL: testSelectWithoutFrom - {err}"
   | Sum.inr stmt =>
       match stmt with
-      | Statement.Select [SelectItem.Expr (Expr.Literal (Literal.Integer 1)) none] none _ _ _ _ =>
+      | Statement.Select [SelectItem.Expr (Expr.Literal (Literal.Integer 1)) none] none _ _ _ _ _ _ =>
           IO.println "PASS: testSelectWithoutFrom"
       | _ => 
           IO.println s!"FAIL: testSelectWithoutFrom - Unexpected parse result: {repr stmt}"
@@ -251,7 +251,7 @@ def testMultipleColumnTypes : IO Unit := do
       IO.println s!"FAIL: testMultipleColumnTypes - {err}"
   | Sum.inr stmt =>
       match stmt with
-      | Statement.Select cols _ _ _ _ _ =>
+      | Statement.Select cols _ _ _ _ _ _ _ =>
           if cols.length == 5 then
             IO.println "PASS: testMultipleColumnTypes"
           else
@@ -266,7 +266,7 @@ def testArithmeticInSelect : IO Unit := do
       IO.println s!"FAIL: testArithmeticInSelect - {err}"
   | Sum.inr stmt =>
       match stmt with
-      | Statement.Select cols _ _ _ _ _ =>
+      | Statement.Select cols _ _ _ _ _ _ _ =>
           if cols.length == 2 then
             IO.println "PASS: testArithmeticInSelect"
           else
@@ -309,7 +309,7 @@ def testMixedCaseKeywords : IO Unit := do
       IO.println s!"FAIL: testMixedCaseKeywords - {err}"
   | Sum.inr stmt =>
       match stmt with
-      | Statement.Select _ (some (TableRef.Table "UsErS" none)) (some _) _ _ _ =>
+      | Statement.Select _ (some (TableRef.Table "UsErS" none)) (some _) _ _ _ _ _ =>
           IO.println "PASS: testMixedCaseKeywords"
       | _ => 
           IO.println s!"FAIL: testMixedCaseKeywords - Unexpected parse result: {repr stmt}"
@@ -362,7 +362,7 @@ def testInnerJoin : IO Unit := do
       IO.println s!"FAIL: testInnerJoin - {err}"
   | Sum.inr stmt =>
       match stmt with
-      | Statement.Select _ (some (TableRef.Join _ .Inner _ _)) _ _ _ _ =>
+      | Statement.Select _ (some (TableRef.Join _ .Inner _ _)) _ _ _ _ _ _ =>
           IO.println "PASS: testInnerJoin"
       | _ =>
           IO.println s!"FAIL: testInnerJoin - Unexpected parse result: {repr stmt}"
@@ -374,7 +374,7 @@ def testLeftJoin : IO Unit := do
       IO.println s!"FAIL: testLeftJoin - {err}"
   | Sum.inr stmt =>
       match stmt with
-      | Statement.Select _ (some (TableRef.Join _ .Left _ _)) _ _ _ _ =>
+      | Statement.Select _ (some (TableRef.Join _ .Left _ _)) _ _ _ _ _ _ =>
           IO.println "PASS: testLeftJoin"
       | _ =>
           IO.println s!"FAIL: testLeftJoin - Unexpected parse result: {repr stmt}"
@@ -386,7 +386,7 @@ def testLeftOuterJoin : IO Unit := do
       IO.println s!"FAIL: testLeftOuterJoin - {err}"
   | Sum.inr stmt =>
       match stmt with
-      | Statement.Select _ (some (TableRef.Join _ .Left _ _)) _ _ _ _ =>
+      | Statement.Select _ (some (TableRef.Join _ .Left _ _)) _ _ _ _ _ _ =>
           IO.println "PASS: testLeftOuterJoin"
       | _ =>
           IO.println s!"FAIL: testLeftOuterJoin - Unexpected parse result: {repr stmt}"
@@ -398,7 +398,7 @@ def testRightJoin : IO Unit := do
       IO.println s!"FAIL: testRightJoin - {err}"
   | Sum.inr stmt =>
       match stmt with
-      | Statement.Select _ (some (TableRef.Join _ .Right _ _)) _ _ _ _ =>
+      | Statement.Select _ (some (TableRef.Join _ .Right _ _)) _ _ _ _ _ _ =>
           IO.println "PASS: testRightJoin"
       | _ =>
           IO.println s!"FAIL: testRightJoin - Unexpected parse result: {repr stmt}"
@@ -410,7 +410,7 @@ def testPlainJoin : IO Unit := do
       IO.println s!"FAIL: testPlainJoin - {err}"
   | Sum.inr stmt =>
       match stmt with
-      | Statement.Select _ (some (TableRef.Join _ .Inner _ _)) _ _ _ _ =>
+      | Statement.Select _ (some (TableRef.Join _ .Inner _ _)) _ _ _ _ _ _ =>
           IO.println "PASS: testPlainJoin"
       | _ =>
           IO.println s!"FAIL: testPlainJoin - Unexpected parse result: {repr stmt}"
@@ -422,7 +422,7 @@ def testJoinWithAliases : IO Unit := do
       IO.println s!"FAIL: testJoinWithAliases - {err}"
   | Sum.inr stmt =>
       match stmt with
-      | Statement.Select cols (some (TableRef.Join (TableRef.Table "users" (some "u")) .Inner (TableRef.Table "orders" (some "o")) _)) _ _ _ _ =>
+      | Statement.Select cols (some (TableRef.Join (TableRef.Table "users" (some "u")) .Inner (TableRef.Table "orders" (some "o")) _)) _ _ _ _ _ _ =>
           if cols.length == 2 then
             IO.println "PASS: testJoinWithAliases"
           else
@@ -437,7 +437,7 @@ def testMultipleJoins : IO Unit := do
       IO.println s!"FAIL: testMultipleJoins - {err}"
   | Sum.inr stmt =>
       match stmt with
-      | Statement.Select _ (some (TableRef.Join (TableRef.Join _ _ _ _) _ _ _)) _ _ _ _ =>
+      | Statement.Select _ (some (TableRef.Join (TableRef.Join _ _ _ _) _ _ _)) _ _ _ _ _ _ =>
           IO.println "PASS: testMultipleJoins"
       | _ =>
           IO.println s!"FAIL: testMultipleJoins - Unexpected parse result: {repr stmt}"
@@ -449,7 +449,7 @@ def testJoinWithWhere : IO Unit := do
       IO.println s!"FAIL: testJoinWithWhere - {err}"
   | Sum.inr stmt =>
       match stmt with
-      | Statement.Select _ (some (TableRef.Join _ _ _ _)) (some _) _ _ _ =>
+      | Statement.Select _ (some (TableRef.Join _ _ _ _)) (some _) _ _ _ _ _ =>
           IO.println "PASS: testJoinWithWhere"
       | _ =>
           IO.println s!"FAIL: testJoinWithWhere - Unexpected parse result: {repr stmt}"
@@ -461,10 +461,169 @@ def testFullOuterJoin : IO Unit := do
       IO.println s!"FAIL: testFullOuterJoin - {err}"
   | Sum.inr stmt =>
       match stmt with
-      | Statement.Select _ (some (TableRef.Join _ .Full _ _)) _ _ _ _ =>
+      | Statement.Select _ (some (TableRef.Join _ .Full _ _)) _ _ _ _ _ _ =>
           IO.println "PASS: testFullOuterJoin"
       | _ =>
           IO.println s!"FAIL: testFullOuterJoin - Unexpected parse result: {repr stmt}"
+
+-- Test COUNT(*)
+def testCountStar : IO Unit := do
+  match parseSQL "SELECT COUNT(*) FROM users" with
+  | Sum.inl err =>
+      IO.println s!"FAIL: testCountStar - {err}"
+  | Sum.inr stmt =>
+      match stmt with
+      | Statement.Select [SelectItem.Expr (Expr.Aggregate .Count .Star false) none] _ _ _ _ _ _ _ =>
+          IO.println "PASS: testCountStar"
+      | _ =>
+          IO.println s!"FAIL: testCountStar - Unexpected parse result: {repr stmt}"
+
+-- Test COUNT(column)
+def testCountColumn : IO Unit := do
+  match parseSQL "SELECT COUNT(id) FROM users" with
+  | Sum.inl err =>
+      IO.println s!"FAIL: testCountColumn - {err}"
+  | Sum.inr stmt =>
+      match stmt with
+      | Statement.Select [SelectItem.Expr (Expr.Aggregate .Count (Expr.Identifier "id") false) none] _ _ _ _ _ _ _ =>
+          IO.println "PASS: testCountColumn"
+      | _ =>
+          IO.println s!"FAIL: testCountColumn - Unexpected parse result: {repr stmt}"
+
+-- Test COUNT(DISTINCT column)
+def testCountDistinct : IO Unit := do
+  match parseSQL "SELECT COUNT(DISTINCT email) FROM users" with
+  | Sum.inl err =>
+      IO.println s!"FAIL: testCountDistinct - {err}"
+  | Sum.inr stmt =>
+      match stmt with
+      | Statement.Select [SelectItem.Expr (Expr.Aggregate .Count (Expr.Identifier "email") true) none] _ _ _ _ _ _ _ =>
+          IO.println "PASS: testCountDistinct"
+      | _ =>
+          IO.println s!"FAIL: testCountDistinct - Unexpected parse result: {repr stmt}"
+
+-- Test SUM
+def testSum : IO Unit := do
+  match parseSQL "SELECT SUM(amount) FROM orders" with
+  | Sum.inl err =>
+      IO.println s!"FAIL: testSum - {err}"
+  | Sum.inr stmt =>
+      match stmt with
+      | Statement.Select [SelectItem.Expr (Expr.Aggregate .Sum _ false) none] _ _ _ _ _ _ _ =>
+          IO.println "PASS: testSum"
+      | _ =>
+          IO.println s!"FAIL: testSum - Unexpected parse result: {repr stmt}"
+
+-- Test AVG
+def testAvg : IO Unit := do
+  match parseSQL "SELECT AVG(price) FROM products" with
+  | Sum.inl err =>
+      IO.println s!"FAIL: testAvg - {err}"
+  | Sum.inr stmt =>
+      match stmt with
+      | Statement.Select [SelectItem.Expr (Expr.Aggregate .Avg _ false) none] _ _ _ _ _ _ _ =>
+          IO.println "PASS: testAvg"
+      | _ =>
+          IO.println s!"FAIL: testAvg - Unexpected parse result: {repr stmt}"
+
+-- Test MIN and MAX
+def testMinMax : IO Unit := do
+  match parseSQL "SELECT MIN(price), MAX(price) FROM products" with
+  | Sum.inl err =>
+      IO.println s!"FAIL: testMinMax - {err}"
+  | Sum.inr stmt =>
+      match stmt with
+      | Statement.Select [SelectItem.Expr (Expr.Aggregate .Min _ _) _, SelectItem.Expr (Expr.Aggregate .Max _ _) _] _ _ _ _ _ _ _ =>
+          IO.println "PASS: testMinMax"
+      | _ =>
+          IO.println s!"FAIL: testMinMax - Unexpected parse result: {repr stmt}"
+
+-- Test aggregate with alias
+def testAggregateWithAlias : IO Unit := do
+  match parseSQL "SELECT COUNT(*) AS total FROM users" with
+  | Sum.inl err =>
+      IO.println s!"FAIL: testAggregateWithAlias - {err}"
+  | Sum.inr stmt =>
+      match stmt with
+      | Statement.Select [SelectItem.Expr (Expr.Aggregate .Count .Star false) (some "total")] _ _ _ _ _ _ _ =>
+          IO.println "PASS: testAggregateWithAlias"
+      | _ =>
+          IO.println s!"FAIL: testAggregateWithAlias - Unexpected parse result: {repr stmt}"
+
+-- Test multiple aggregates
+def testMultipleAggregates : IO Unit := do
+  match parseSQL "SELECT COUNT(*), SUM(amount), AVG(amount) FROM orders" with
+  | Sum.inl err =>
+      IO.println s!"FAIL: testMultipleAggregates - {err}"
+  | Sum.inr stmt =>
+      match stmt with
+      | Statement.Select cols _ _ _ _ _ _ _ =>
+          if cols.length == 3 then
+            IO.println "PASS: testMultipleAggregates"
+          else
+            IO.println s!"FAIL: testMultipleAggregates - Expected 3 columns, got {cols.length}"
+      | _ =>
+          IO.println s!"FAIL: testMultipleAggregates - Unexpected parse result: {repr stmt}"
+
+-- Test GROUP BY
+def testGroupBy : IO Unit := do
+  match parseSQL "SELECT category, COUNT(*) FROM products GROUP BY category" with
+  | Sum.inl err =>
+      IO.println s!"FAIL: testGroupBy - {err}"
+  | Sum.inr stmt =>
+      match stmt with
+      | Statement.Select _ _ _ groupBy _ _ _ _ =>
+          if groupBy.length == 1 then
+            IO.println "PASS: testGroupBy"
+          else
+            IO.println s!"FAIL: testGroupBy - Expected 1 GROUP BY expr, got {groupBy.length}"
+      | _ =>
+          IO.println s!"FAIL: testGroupBy - Unexpected parse result: {repr stmt}"
+
+-- Test GROUP BY with multiple columns
+def testGroupByMultiple : IO Unit := do
+  match parseSQL "SELECT category, brand, SUM(price) FROM products GROUP BY category, brand" with
+  | Sum.inl err =>
+      IO.println s!"FAIL: testGroupByMultiple - {err}"
+  | Sum.inr stmt =>
+      match stmt with
+      | Statement.Select _ _ _ groupBy _ _ _ _ =>
+          if groupBy.length == 2 then
+            IO.println "PASS: testGroupByMultiple"
+          else
+            IO.println s!"FAIL: testGroupByMultiple - Expected 2 GROUP BY exprs, got {groupBy.length}"
+      | _ =>
+          IO.println s!"FAIL: testGroupByMultiple - Unexpected parse result: {repr stmt}"
+
+-- Test GROUP BY with HAVING
+def testGroupByHaving : IO Unit := do
+  match parseSQL "SELECT category, COUNT(*) FROM products GROUP BY category HAVING COUNT(*) > 5" with
+  | Sum.inl err =>
+      IO.println s!"FAIL: testGroupByHaving - {err}"
+  | Sum.inr stmt =>
+      match stmt with
+      | Statement.Select _ _ _ groupBy (some _) _ _ _ =>
+          if groupBy.length == 1 then
+            IO.println "PASS: testGroupByHaving"
+          else
+            IO.println s!"FAIL: testGroupByHaving - Expected 1 GROUP BY expr, got {groupBy.length}"
+      | _ =>
+          IO.println s!"FAIL: testGroupByHaving - Unexpected parse result: {repr stmt}"
+
+-- Test full query with GROUP BY, HAVING, ORDER BY
+def testGroupByFull : IO Unit := do
+  match parseSQL "SELECT category, SUM(price) AS total FROM products WHERE active = 1 GROUP BY category HAVING SUM(price) > 100 ORDER BY total DESC LIMIT 10" with
+  | Sum.inl err =>
+      IO.println s!"FAIL: testGroupByFull - {err}"
+  | Sum.inr stmt =>
+      match stmt with
+      | Statement.Select _ _ (some _) groupBy (some _) orderBy (some 10) _ =>
+          if groupBy.length == 1 && orderBy.length == 1 then
+            IO.println "PASS: testGroupByFull"
+          else
+            IO.println s!"FAIL: testGroupByFull - Unexpected groupBy/orderBy lengths"
+      | _ =>
+          IO.println s!"FAIL: testGroupByFull - Unexpected parse result: {repr stmt}"
 
 -- Run all extended parser tests
 def runExtendedParserTests : IO Unit := do
@@ -506,6 +665,18 @@ def runExtendedParserTests : IO Unit := do
   testMultipleJoins
   testJoinWithWhere
   testFullOuterJoin
+  testCountStar
+  testCountColumn
+  testCountDistinct
+  testSum
+  testAvg
+  testMinMax
+  testAggregateWithAlias
+  testMultipleAggregates
+  testGroupBy
+  testGroupByMultiple
+  testGroupByHaving
+  testGroupByFull
   IO.println ""
 
 end SQLinLean.Tests
