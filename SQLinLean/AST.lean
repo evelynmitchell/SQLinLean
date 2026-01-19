@@ -3,6 +3,15 @@ import SQLinLean.Token
 
 namespace SQLinLean
 
+-- Aggregate function types
+inductive AggregateFunc where
+  | Count
+  | Sum
+  | Avg
+  | Min
+  | Max
+  deriving Repr, BEq, Nonempty
+
 -- SQL Expression types
 inductive Expr where
   | Literal (lit : Literal)
@@ -12,6 +21,7 @@ inductive Expr where
   | QualifiedStar (table : String)
   | BinaryOp (left : Expr) (op : Operator) (right : Expr)
   | Not (expr : Expr)  -- NOT unary operator
+  | Aggregate (func : AggregateFunc) (arg : Expr) (distinct : Bool)  -- COUNT(x), SUM(DISTINCT x), etc.
   deriving Repr, BEq, Nonempty
 
 -- Column selection in SELECT

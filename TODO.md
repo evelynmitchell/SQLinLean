@@ -28,7 +28,7 @@ Based on ROADMAP.md Phase 1 and expected corpus failures:
 - [x] JOIN parsing (INNER, LEFT, RIGHT, FULL OUTER)
 - [x] ORDER BY parsing (PR #29)
 - [x] LIMIT/OFFSET parsing (PR #29)
-- [ ] Aggregate functions (COUNT, SUM, AVG, MIN, MAX)
+- [x] Aggregate functions (COUNT, SUM, AVG, MIN, MAX) (PR #30)
 - [ ] GROUP BY / HAVING
 
 ### Medium Priority

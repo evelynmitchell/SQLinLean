@@ -466,6 +466,105 @@ def testFullOuterJoin : IO Unit := do
       | _ =>
           IO.println s!"FAIL: testFullOuterJoin - Unexpected parse result: {repr stmt}"
 
+-- Test COUNT(*)
+def testCountStar : IO Unit := do
+  match parseSQL "SELECT COUNT(*) FROM users" with
+  | Sum.inl err =>
+      IO.println s!"FAIL: testCountStar - {err}"
+  | Sum.inr stmt =>
+      match stmt with
+      | Statement.Select [SelectItem.Expr (Expr.Aggregate .Count .Star false) none] _ _ _ _ _ =>
+          IO.println "PASS: testCountStar"
+      | _ =>
+          IO.println s!"FAIL: testCountStar - Unexpected parse result: {repr stmt}"
+
+-- Test COUNT(column)
+def testCountColumn : IO Unit := do
+  match parseSQL "SELECT COUNT(id) FROM users" with
+  | Sum.inl err =>
+      IO.println s!"FAIL: testCountColumn - {err}"
+  | Sum.inr stmt =>
+      match stmt with
+      | Statement.Select [SelectItem.Expr (Expr.Aggregate .Count (Expr.Identifier "id") false) none] _ _ _ _ _ =>
+          IO.println "PASS: testCountColumn"
+      | _ =>
+          IO.println s!"FAIL: testCountColumn - Unexpected parse result: {repr stmt}"
+
+-- Test COUNT(DISTINCT column)
+def testCountDistinct : IO Unit := do
+  match parseSQL "SELECT COUNT(DISTINCT email) FROM users" with
+  | Sum.inl err =>
+      IO.println s!"FAIL: testCountDistinct - {err}"
+  | Sum.inr stmt =>
+      match stmt with
+      | Statement.Select [SelectItem.Expr (Expr.Aggregate .Count (Expr.Identifier "email") true) none] _ _ _ _ _ =>
+          IO.println "PASS: testCountDistinct"
+      | _ =>
+          IO.println s!"FAIL: testCountDistinct - Unexpected parse result: {repr stmt}"
+
+-- Test SUM
+def testSum : IO Unit := do
+  match parseSQL "SELECT SUM(amount) FROM orders" with
+  | Sum.inl err =>
+      IO.println s!"FAIL: testSum - {err}"
+  | Sum.inr stmt =>
+      match stmt with
+      | Statement.Select [SelectItem.Expr (Expr.Aggregate .Sum _ false) none] _ _ _ _ _ =>
+          IO.println "PASS: testSum"
+      | _ =>
+          IO.println s!"FAIL: testSum - Unexpected parse result: {repr stmt}"
+
+-- Test AVG
+def testAvg : IO Unit := do
+  match parseSQL "SELECT AVG(price) FROM products" with
+  | Sum.inl err =>
+      IO.println s!"FAIL: testAvg - {err}"
+  | Sum.inr stmt =>
+      match stmt with
+      | Statement.Select [SelectItem.Expr (Expr.Aggregate .Avg _ false) none] _ _ _ _ _ =>
+          IO.println "PASS: testAvg"
+      | _ =>
+          IO.println s!"FAIL: testAvg - Unexpected parse result: {repr stmt}"
+
+-- Test MIN and MAX
+def testMinMax : IO Unit := do
+  match parseSQL "SELECT MIN(price), MAX(price) FROM products" with
+  | Sum.inl err =>
+      IO.println s!"FAIL: testMinMax - {err}"
+  | Sum.inr stmt =>
+      match stmt with
+      | Statement.Select [SelectItem.Expr (Expr.Aggregate .Min _ _) _, SelectItem.Expr (Expr.Aggregate .Max _ _) _] _ _ _ _ _ =>
+          IO.println "PASS: testMinMax"
+      | _ =>
+          IO.println s!"FAIL: testMinMax - Unexpected parse result: {repr stmt}"
+
+-- Test aggregate with alias
+def testAggregateWithAlias : IO Unit := do
+  match parseSQL "SELECT COUNT(*) AS total FROM users" with
+  | Sum.inl err =>
+      IO.println s!"FAIL: testAggregateWithAlias - {err}"
+  | Sum.inr stmt =>
+      match stmt with
+      | Statement.Select [SelectItem.Expr (Expr.Aggregate .Count .Star false) (some "total")] _ _ _ _ _ =>
+          IO.println "PASS: testAggregateWithAlias"
+      | _ =>
+          IO.println s!"FAIL: testAggregateWithAlias - Unexpected parse result: {repr stmt}"
+
+-- Test multiple aggregates
+def testMultipleAggregates : IO Unit := do
+  match parseSQL "SELECT COUNT(*), SUM(amount), AVG(amount) FROM orders" with
+  | Sum.inl err =>
+      IO.println s!"FAIL: testMultipleAggregates - {err}"
+  | Sum.inr stmt =>
+      match stmt with
+      | Statement.Select cols _ _ _ _ _ =>
+          if cols.length == 3 then
+            IO.println "PASS: testMultipleAggregates"
+          else
+            IO.println s!"FAIL: testMultipleAggregates - Expected 3 columns, got {cols.length}"
+      | _ =>
+          IO.println s!"FAIL: testMultipleAggregates - Unexpected parse result: {repr stmt}"
+
 -- Run all extended parser tests
 def runExtendedParserTests : IO Unit := do
   IO.println "=== Running Extended Parser Tests ==="
@@ -506,6 +605,14 @@ def runExtendedParserTests : IO Unit := do
   testMultipleJoins
   testJoinWithWhere
   testFullOuterJoin
+  testCountStar
+  testCountColumn
+  testCountDistinct
+  testSum
+  testAvg
+  testMinMax
+  testAggregateWithAlias
+  testMultipleAggregates
   IO.println ""
 
 end SQLinLean.Tests
