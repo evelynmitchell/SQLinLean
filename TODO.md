@@ -7,7 +7,7 @@ Prioritized task list for the project.
 
 - [x] Merge PR #18 (Codespace setup + Claude skills) ✓
 - [x] Merge PR #25 (Use case docs + testing infrastructure) ✓
-- [ ] Merge PR #29 (ORDER BY, LIMIT, OFFSET parsing)
+- [x] Merge PR #29 (ORDER BY, LIMIT, OFFSET parsing) ✓
 - [ ] Download Spider dataset: `./scripts/download-spider.sh`
 - [ ] Run baseline parser test: `./scripts/test-corpus.sh spider`
 - [ ] Document current parse success rate
