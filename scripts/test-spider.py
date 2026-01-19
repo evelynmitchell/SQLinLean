@@ -34,9 +34,11 @@ def categorize_failure(query: str) -> str:
 
     # Check for subquery (nested SELECT)
     if 'SELECT' in q and '(' in q:
-        after_paren = q[q.index('(')+1:]
-        if 'SELECT' in after_paren:
-            return 'Subquery'
+        paren_idx = q.index('(')
+        if paren_idx + 1 < len(q):
+            after_paren = q[paren_idx + 1:]
+            if 'SELECT' in after_paren:
+                return 'Subquery'
 
     if ' EXCEPT ' in q:
         return 'EXCEPT'

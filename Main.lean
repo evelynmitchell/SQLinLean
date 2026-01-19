@@ -21,7 +21,7 @@ def parseStdin : IO UInt32 := do
   let input ← IO.getStdin >>= (·.getLine)
   let sql := input.trim
   if sql.isEmpty then
-    return 0
+    return 1  -- Empty input is invalid SQL
   match parseSQL sql with
   | .inl _ => return 1
   | .inr _ => return 0

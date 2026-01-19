@@ -196,6 +196,8 @@ mutual
       | _ => ParserResult.ok expr s'
 
   -- Parse column list for subquery SELECT
+  -- Note: This duplicates some logic from parseSelectItem (defined after mutual block)
+  -- because we need to call parseOr directly within the mutual block.
   partial def parseSubqueryColumns (s : ParserState) : ParserResult (List SelectItem) :=
     let rec loop (state : ParserState) : ParserResult (List SelectItem) :=
       match state.peek with
@@ -229,6 +231,8 @@ mutual
     loop s
 
   -- Parse simple table reference for subquery (table [AS alias])
+  -- Note: This duplicates parseTableRefSimple (defined after mutual block)
+  -- because we need access to parseOr for JOIN conditions.
   partial def parseSubqueryTableSimple (s : ParserState) : ParserResult TableRef :=
     match s.peek with
     | some (.Identifier name) =>
@@ -299,7 +303,10 @@ mutual
             | _ => .error "Expected ON after JOIN" sAfterRight
       parseJoins left sAfterLeft
 
-  -- Parse a simple SELECT subquery (covers most common patterns)
+  -- Parse a SELECT subquery (covers full SELECT syntax for subqueries)
+  -- Note: This function duplicates parseSelect logic because it must be in the
+  -- mutual block to allow parseOr/parsePrimary to parse (SELECT ...) subqueries.
+  -- Lean's mutual recursion requires all mutually recursive functions in one block.
   partial def parseSubquerySelect (s : ParserState) : ParserResult Statement :=
     match s.peek with
     | some (.Keyword .SELECT) =>
@@ -611,8 +618,10 @@ def tryParseJoinType (s : ParserState) : Option JoinType × ParserState :=
   | _ => (none, s)
 
 -- Parse table reference with optional joins
--- Handles: table [AS alias] [[INNER|LEFT|RIGHT|FULL] [OUTER] JOIN table [AS alias] [ON expr]]*
--- Also handles non-standard multi-JOIN syntax: JOIN t1 JOIN t2 ON (combined condition)
+-- Standard syntax: table [AS alias] [[INNER|LEFT|RIGHT|FULL] [OUTER] JOIN table [AS alias] ON expr]*
+-- Non-standard extension: Accepts multi-JOIN without immediate ON clause (found in Spider benchmark)
+--   Example: JOIN t1 JOIN t2 ON combined_condition
+--   In this case, intermediate JOINs use Expr.True as placeholder condition
 partial def parseTableRef (s : ParserState) : ParserResult TableRef :=
   match parseTableRefSimple s with
   | .error msg state => .error msg state
@@ -635,11 +644,12 @@ where
             parseTableRefJoins joinedTable s'''
         | _ =>
           -- No ON clause - check if there's another JOIN (multi-JOIN syntax)
+          -- This is a non-standard SQL extension found in Spider benchmark queries
           let (nextJoinType, _) := tryParseJoinType s''
           match nextJoinType with
           | some _ =>
-            -- Another JOIN follows, use a placeholder TRUE condition for now
-            let joinedTable := TableRef.Join leftTable jt rightTable (.Literal (.Integer 1))
+            -- Another JOIN follows, use Expr.True as placeholder condition
+            let joinedTable := TableRef.Join leftTable jt rightTable .True
             parseTableRefJoins joinedTable s''
           | none =>
             -- No more joins and no ON - error for standard case

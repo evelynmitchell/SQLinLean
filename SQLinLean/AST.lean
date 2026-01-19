@@ -37,6 +37,7 @@ mutual
     | InSubquery (expr : Expr) (subquery : Statement) (negated : Bool)  -- IN (SELECT ...)
     | Between (expr : Expr) (low : Expr) (high : Expr) (negated : Bool)  -- BETWEEN low AND high
     | Subquery (stmt : Statement)  -- Scalar subquery: (SELECT ...)
+    | True  -- Boolean TRUE constant (used for placeholder conditions in non-standard multi-JOIN syntax)
 
   -- Column selection in SELECT
   inductive SelectItem where
