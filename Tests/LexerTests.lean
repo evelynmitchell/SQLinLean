@@ -6,137 +6,58 @@ namespace SQLinLean.Tests
 
 open SQLinLean
 
--- Test tokenizing simple SELECT
-def testSelectTokens : IO Unit := do
-  match tokenizeString "SELECT * FROM users" with
-  | LexerResult.error msg _ => 
-      IO.println s!"FAIL: testSelectTokens - {msg}"
+-- Test helper: tokenize and compare expected tokens
+def lexTest (name : String) (input : String) (expected : List Token) : IO Unit := do
+  match tokenizeString input with
+  | LexerResult.error msg _ => IO.println s!"FAIL: {name} - {msg}"
   | LexerResult.ok tokens _ =>
-      let expected := [
-        Token.Keyword Keyword.SELECT,
-        Token.Star,
-        Token.Keyword Keyword.FROM,
-        Token.Identifier "users",
-        Token.EOF
-      ]
-      if tokens == expected then
-        IO.println "PASS: testSelectTokens"
-      else
-        IO.println s!"FAIL: testSelectTokens - Expected {repr expected}, got {repr tokens}"
+      if tokens == expected then IO.println s!"PASS: {name}"
+      else IO.println s!"FAIL: {name} - Expected {repr expected}, got {repr tokens}"
 
--- Test tokenizing numbers
-def testNumbers : IO Unit := do
-  match tokenizeString "42 100" with
-  | LexerResult.error msg _ => 
-      IO.println s!"FAIL: testNumbers - {msg}"
+-- Test helper: tokenize and validate with custom predicate
+def lexTestWith (name : String) (input : String) (validate : List Token → Bool) : IO Unit := do
+  match tokenizeString input with
+  | LexerResult.error msg _ => IO.println s!"FAIL: {name} - {msg}"
   | LexerResult.ok tokens _ =>
-      match tokens with
-      | [Token.Literal (Literal.Integer 42), Token.Literal (Literal.Integer 100), Token.EOF] =>
-          IO.println "PASS: testNumbers"
-      | _ => 
-          IO.println s!"FAIL: testNumbers - Got {repr tokens}"
+      if validate tokens then IO.println s!"PASS: {name}"
+      else IO.println s!"FAIL: {name} - Got {repr tokens}"
 
--- Test tokenizing float literals
-def testFloats : IO Unit := do
-  match tokenizeString "3.14 2.5" with
-  | LexerResult.error msg _ => 
-      IO.println s!"FAIL: testFloats - {msg}"
-  | LexerResult.ok tokens _ =>
-      match tokens with
-      | [Token.Literal (Literal.Float _), Token.Literal (Literal.Float _), Token.EOF] =>
-          IO.println "PASS: testFloats"
-      | _ => 
-          IO.println s!"FAIL: testFloats - Got {repr tokens}"
+def testSelectTokens : IO Unit :=
+  lexTest "testSelectTokens" "SELECT * FROM users"
+    [.Keyword .SELECT, .Star, .Keyword .FROM, .Identifier "users", .EOF]
 
--- Test tokenizing negative numbers (parsed as operator + number)
-def testNegativeNumbers : IO Unit := do
-  match tokenizeString "-5 -3.14" with
-  | LexerResult.error msg _ => 
-      IO.println s!"FAIL: testNegativeNumbers - {msg}"
-  | LexerResult.ok tokens _ =>
-      match tokens with
-      | [Token.Operator Operator.Minus, Token.Literal (Literal.Integer 5), 
-         Token.Operator Operator.Minus, Token.Literal (Literal.Float _), Token.EOF] =>
-          IO.println "PASS: testNegativeNumbers"
-      | _ => 
-          IO.println s!"FAIL: testNegativeNumbers - Got {repr tokens}"
+def testNumbers : IO Unit :=
+  lexTest "testNumbers" "42 100"
+    [.Literal (.Integer 42), .Literal (.Integer 100), .EOF]
 
--- Test tokenizing strings
-def testStrings : IO Unit := do
-  match tokenizeString "'hello' 'world'" with
-  | LexerResult.error msg _ => 
-      IO.println s!"FAIL: testStrings - {msg}"
-  | LexerResult.ok tokens _ =>
-      let expected := [
-        Token.Literal (Literal.String "hello"),
-        Token.Literal (Literal.String "world"),
-        Token.EOF
-      ]
-      if tokens == expected then
-        IO.println "PASS: testStrings"
-      else
-        IO.println s!"FAIL: testStrings - Expected {repr expected}, got {repr tokens}"
+def testFloats : IO Unit :=
+  lexTestWith "testFloats" "3.14 2.5" fun
+    | [.Literal (.Float _), .Literal (.Float _), .EOF] => true
+    | _ => false
 
--- Test tokenizing operators
-def testOperators : IO Unit := do
-  match tokenizeString "= != < > <= >= + - * /" with
-  | LexerResult.error msg _ => 
-      IO.println s!"FAIL: testOperators - {msg}"
-  | LexerResult.ok tokens _ =>
-      let expected := [
-        Token.Operator Operator.Equals,
-        Token.Operator Operator.NotEquals,
-        Token.Operator Operator.LessThan,
-        Token.Operator Operator.GreaterThan,
-        Token.Operator Operator.LessOrEqual,
-        Token.Operator Operator.GreaterOrEqual,
-        Token.Operator Operator.Plus,
-        Token.Operator Operator.Minus,
-        Token.Star,
-        Token.Operator Operator.Divide,
-        Token.EOF
-      ]
-      if tokens == expected then
-        IO.println "PASS: testOperators"
-      else
-        IO.println s!"FAIL: testOperators - Expected {repr expected}, got {repr tokens}"
+def testNegativeNumbers : IO Unit :=
+  lexTestWith "testNegativeNumbers" "-5 -3.14" fun
+    | [.Operator .Minus, .Literal (.Integer 5), .Operator .Minus, .Literal (.Float _), .EOF] => true
+    | _ => false
 
--- Test tokenizing keywords
-def testKeywords : IO Unit := do
-  match tokenizeString "SELECT INSERT UPDATE DELETE WHERE FROM" with
-  | LexerResult.error msg _ => 
-      IO.println s!"FAIL: testKeywords - {msg}"
-  | LexerResult.ok tokens _ =>
-      let expected := [
-        Token.Keyword Keyword.SELECT,
-        Token.Keyword Keyword.INSERT,
-        Token.Keyword Keyword.UPDATE,
-        Token.Keyword Keyword.DELETE,
-        Token.Keyword Keyword.WHERE,
-        Token.Keyword Keyword.FROM,
-        Token.EOF
-      ]
-      if tokens == expected then
-        IO.println "PASS: testKeywords"
-      else
-        IO.println s!"FAIL: testKeywords - Expected {repr expected}, got {repr tokens}"
+def testStrings : IO Unit :=
+  lexTest "testStrings" "'hello' 'world'"
+    [.Literal (.String "hello"), .Literal (.String "world"), .EOF]
 
--- Test case insensitivity
-def testCaseInsensitivity : IO Unit := do
-  match tokenizeString "select SELECT SeLeCt" with
-  | LexerResult.error msg _ => 
-      IO.println s!"FAIL: testCaseInsensitivity - {msg}"
-  | LexerResult.ok tokens _ =>
-      let expected := [
-        Token.Keyword Keyword.SELECT,
-        Token.Keyword Keyword.SELECT,
-        Token.Keyword Keyword.SELECT,
-        Token.EOF
-      ]
-      if tokens == expected then
-        IO.println "PASS: testCaseInsensitivity"
-      else
-        IO.println s!"FAIL: testCaseInsensitivity - Expected {repr expected}, got {repr tokens}"
+def testOperators : IO Unit :=
+  lexTest "testOperators" "= != < > <= >= + - * /"
+    [.Operator .Equals, .Operator .NotEquals, .Operator .LessThan, .Operator .GreaterThan,
+     .Operator .LessOrEqual, .Operator .GreaterOrEqual, .Operator .Plus, .Operator .Minus,
+     .Star, .Operator .Divide, .EOF]
+
+def testKeywords : IO Unit :=
+  lexTest "testKeywords" "SELECT INSERT UPDATE DELETE WHERE FROM"
+    [.Keyword .SELECT, .Keyword .INSERT, .Keyword .UPDATE,
+     .Keyword .DELETE, .Keyword .WHERE, .Keyword .FROM, .EOF]
+
+def testCaseInsensitivity : IO Unit :=
+  lexTest "testCaseInsensitivity" "select SELECT SeLeCt"
+    [.Keyword .SELECT, .Keyword .SELECT, .Keyword .SELECT, .EOF]
 
 -- Run all lexer tests
 def runLexerTests : IO Unit := do
