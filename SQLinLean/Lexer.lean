@@ -17,7 +17,7 @@ inductive LexerResult (α : Type) where
 
 -- Helper functions
 def LexerState.peek (s : LexerState) : Option Char :=
-  s.input.get? ⟨s.position⟩
+  s.input.toList[s.position]?
 
 def LexerState.advance (s : LexerState) (n : Nat := 1) : LexerState :=
   { s with position := s.position + n }
@@ -52,17 +52,17 @@ partial def skipWhitespace (s : LexerState) : LexerState :=
 partial def readWhile (s : LexerState) (pred : Char → Bool) : String × LexerState :=
   let rec loop (state : LexerState) (acc : List Char) : String × LexerState :=
     match state.peek with
-    | none => (String.mk acc.reverse, state)
+    | none => (String.ofList acc.reverse, state)
     | some c =>
       if pred c then
         loop (state.advance) (c :: acc)
       else
-        (String.mk acc.reverse, state)
+        (String.ofList acc.reverse, state)
   loop s []
 
 -- Parse float from string with decimal point
 def parseFloat (s : String) : Option Float :=
-  let parts := s.split (· = '.')
+  let parts := s.splitToList (· = '.')
   match parts with
   | [intPart] =>
     -- No decimal point: parse as integer and convert to float
@@ -105,7 +105,7 @@ partial def readStringContent (acc : List Char) (state : LexerState) : LexerResu
   | none => .error "Unterminated string literal" state
   | some c =>
     if c = '\'' then
-      .ok (.Literal (.String (String.mk acc.reverse))) (state.advance)
+      .ok (.Literal (.String (String.ofList acc.reverse))) (state.advance)
     else if c = '\\' then
       -- Handle common escape sequences
       let state := state.advance

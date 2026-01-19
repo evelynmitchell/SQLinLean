@@ -1,14 +1,24 @@
+
 # SQLinLean TODO
 
 Prioritized task list for the project.
 
 ## Immediate (This Week)
 
-- [ ] Merge PR #18 (Codespace setup + Claude skills)
-- [ ] Merge PR #25 (Use case docs + testing infrastructure)
+- [x] Merge PR #18 (Codespace setup + Claude skills) ✓
+- [x] Merge PR #25 (Use case docs + testing infrastructure) ✓
+- [ ] Merge PR #29 (ORDER BY, LIMIT, OFFSET parsing)
 - [ ] Download Spider dataset: `./scripts/download-spider.sh`
 - [ ] Run baseline parser test: `./scripts/test-corpus.sh spider`
 - [ ] Document current parse success rate
+
+## Known Bugs (Parser)
+
+All previously documented bugs have been fixed:
+
+- [x] ~~NULL keyword not handled~~ - Fixed in `parsePrimary`
+- [x] ~~Table aliases not parsed~~ - Fixed in `parseSelect`
+- [x] ~~NOT operator not parsed~~ - Fixed with `parseNot` function
 
 ## Short-Term (Parser Completion)
 
@@ -22,8 +32,8 @@ Based on ROADMAP.md Phase 1 and expected corpus failures:
 - [ ] GROUP BY / HAVING
 
 ### Medium Priority
-- [ ] UPDATE statement parser - Issue: AST exists
-- [ ] CREATE TABLE parser - Issue: AST exists
+- [ ] UPDATE statement parser - AST exists
+- [ ] CREATE TABLE parser - AST exists
 - [ ] DISTINCT keyword
 - [ ] IN operator
 - [ ] BETWEEN operator
@@ -73,4 +83,4 @@ See `docs/use-cases/` and GitHub issues #19-#27:
 
 ---
 
-*Last updated: 2026-01-18*
+*Last updated: 2026-01-19*
