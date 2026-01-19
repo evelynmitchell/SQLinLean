@@ -51,16 +51,19 @@ def parseIdentifier (s : ParserState) : ParserResult String :=
   | some t => .error s!"Expected identifier, got {repr t}" s
   | none => .error "Expected identifier, got EOF" s
 
+-- Aggregate function keyword mapping
+private def aggregateFuncTable : List (Keyword × AggregateFunc) :=
+  [(.COUNT, .Count), (.SUM, .Sum), (.AVG, .Avg), (.MIN, .Min), (.MAX, .Max)]
+
 -- Expression parsing with mutual recursion and proper precedence
 mutual
   -- Try to parse an aggregate function keyword, returns the function type if found
   partial def tryParseAggregateFunc (s : ParserState) : Option AggregateFunc × ParserState :=
     match s.peek with
-    | some (.Keyword .COUNT) => (some .Count, s.advance)
-    | some (.Keyword .SUM) => (some .Sum, s.advance)
-    | some (.Keyword .AVG) => (some .Avg, s.advance)
-    | some (.Keyword .MIN) => (some .Min, s.advance)
-    | some (.Keyword .MAX) => (some .Max, s.advance)
+    | some (.Keyword kw) =>
+      match aggregateFuncTable.find? (·.1 == kw) with
+      | some (_, func) => (some func, s.advance)
+      | none => (none, s)
     | _ => (none, s)
 
   -- Parse aggregate function: FUNC ( [DISTINCT] expr )
@@ -356,6 +359,17 @@ def parseTableRefSimple (s : ParserState) : ParserResult TableRef :=
       | _ => (none, s')
     .ok (TableRef.Table tableName tableAlias) s''
 
+-- Try to parse [OUTER] JOIN after a join direction keyword, returning state after JOIN
+private def tryParseOuterJoin (s : ParserState) : Option ParserState :=
+  match s.peek with
+  | some (.Keyword .OUTER) =>
+    let s' := s.advance
+    match s'.peek with
+    | some (.Keyword .JOIN) => some s'.advance
+    | _ => none
+  | some (.Keyword .JOIN) => some s.advance
+  | _ => none
+
 -- Try to parse a join type keyword sequence
 -- Returns (some joinType, state after JOIN keyword) or (none, original state)
 def tryParseJoinType (s : ParserState) : Option JoinType × ParserState :=
@@ -366,35 +380,17 @@ def tryParseJoinType (s : ParserState) : Option JoinType × ParserState :=
     | some (.Keyword .JOIN) => (some .Inner, s'.advance)
     | _ => (none, s)
   | some (.Keyword .LEFT) =>
-    let s' := s.advance
-    match s'.peek with
-    | some (.Keyword .OUTER) =>
-      let s'' := s'.advance
-      match s''.peek with
-      | some (.Keyword .JOIN) => (some .Left, s''.advance)
-      | _ => (none, s)
-    | some (.Keyword .JOIN) => (some .Left, s'.advance)
-    | _ => (none, s)
+    match tryParseOuterJoin s.advance with
+    | some s' => (some .Left, s')
+    | none => (none, s)
   | some (.Keyword .RIGHT) =>
-    let s' := s.advance
-    match s'.peek with
-    | some (.Keyword .OUTER) =>
-      let s'' := s'.advance
-      match s''.peek with
-      | some (.Keyword .JOIN) => (some .Right, s''.advance)
-      | _ => (none, s)
-    | some (.Keyword .JOIN) => (some .Right, s'.advance)
-    | _ => (none, s)
+    match tryParseOuterJoin s.advance with
+    | some s' => (some .Right, s')
+    | none => (none, s)
   | some (.Keyword .FULL) =>
-    let s' := s.advance
-    match s'.peek with
-    | some (.Keyword .OUTER) =>
-      let s'' := s'.advance
-      match s''.peek with
-      | some (.Keyword .JOIN) => (some .Full, s''.advance)
-      | _ => (none, s)
-    | some (.Keyword .JOIN) => (some .Full, s'.advance)
-    | _ => (none, s)
+    match tryParseOuterJoin s.advance with
+    | some s' => (some .Full, s')
+    | none => (none, s)
   | some (.Keyword .JOIN) => (some .Inner, s.advance)  -- Plain JOIN = INNER JOIN
   | _ => (none, s)
 
@@ -432,49 +428,36 @@ def parseOrderByItem (s : ParserState) : ParserResult (Expr × Bool) :=
     | some (.Keyword .DESC) => .ok (expr, false) (s'.advance)
     | _ => .ok (expr, true) s'  -- Default to ascending
 
--- Parse ORDER BY clause: ORDER BY expr [ASC|DESC] [, ...]
-partial def parseOrderBy (s : ParserState) : ParserResult (List (Expr × Bool)) :=
+-- Parse KEYWORD BY clause pattern (used for ORDER BY and GROUP BY)
+private partial def parseKeywordByClause {α : Type} (kw : Keyword)
+    (itemParser : ParserState → ParserResult α) (s : ParserState) : ParserResult (List α) :=
   match s.peek with
-  | some (.Keyword .ORDER) =>
-    let s' := s.advance
-    match s'.peek with
-    | some (.Keyword .BY) =>
-      let s'' := s'.advance
-      parseList parseOrderByItem s''
-    | _ => .error "Expected BY after ORDER" s'
-  | _ => .ok [] s  -- No ORDER BY clause
+  | some (.Keyword k) =>
+    if k == kw then
+      let s' := s.advance
+      match s'.peek with
+      | some (.Keyword .BY) => parseList itemParser s'.advance
+      | _ => .error s!"Expected BY after {kw.toString}" s'
+    else .ok [] s
+  | _ => .ok [] s
 
--- Parse LIMIT clause: LIMIT n
-def parseLimit (s : ParserState) : ParserResult (Option Nat) :=
+partial def parseOrderBy := parseKeywordByClause .ORDER parseOrderByItem
+
+-- Parse optional keyword followed by Nat (used for LIMIT and OFFSET)
+private def parseOptionalNat (kw : Keyword) (s : ParserState) : ParserResult (Option Nat) :=
   match s.peek with
-  | some (.Keyword .LIMIT) =>
-    let s' := s.advance
-    match parseNat s' with
-    | .error msg state => .error msg state
-    | .ok n s'' => .ok (some n) s''
+  | some (.Keyword k) =>
+    if k == kw then
+      match parseNat s.advance with
+      | .error msg state => .error msg state
+      | .ok n s' => .ok (some n) s'
+    else .ok none s
   | _ => .ok none s
 
--- Parse OFFSET clause: OFFSET n
-def parseOffset (s : ParserState) : ParserResult (Option Nat) :=
-  match s.peek with
-  | some (.Keyword .OFFSET) =>
-    let s' := s.advance
-    match parseNat s' with
-    | .error msg state => .error msg state
-    | .ok n s'' => .ok (some n) s''
-  | _ => .ok none s
+def parseLimit := parseOptionalNat .LIMIT
+def parseOffset := parseOptionalNat .OFFSET
 
--- Parse GROUP BY clause: GROUP BY expr [, ...]
-partial def parseGroupBy (s : ParserState) : ParserResult (List Expr) :=
-  match s.peek with
-  | some (.Keyword .GROUP) =>
-    let s' := s.advance
-    match s'.peek with
-    | some (.Keyword .BY) =>
-      let s'' := s'.advance
-      parseList parseExpr s''
-    | _ => .error "Expected BY after GROUP" s'
-  | _ => .ok [] s  -- No GROUP BY clause
+partial def parseGroupBy := parseKeywordByClause .GROUP parseExpr
 
 -- Parse HAVING clause: HAVING expr
 def parseHaving (s : ParserState) : ParserResult (Option Expr) :=

@@ -142,6 +142,12 @@ def tokenizeIdentifier (s : LexerState) : LexerResult Token :=
     | some kw => .ok (.Keyword kw) newState
     | none => .ok (.Identifier ident) newState
 
+-- Single-character token mapping
+private def simpleTokenTable : List (Char × Token) :=
+  [('(', .LeftParen), (')', .RightParen), (',', .Comma), (';', .Semicolon),
+   ('*', .Star), ('.', .Dot), ('=', .Operator .Equals),
+   ('+', .Operator .Plus), ('-', .Operator .Minus), ('/', .Operator .Divide)]
+
 -- Tokenize a single token
 def tokenizeOne (s : LexerState) : LexerResult Token :=
   let s := skipWhitespace s
@@ -154,44 +160,30 @@ def tokenizeOne (s : LexerState) : LexerResult Token :=
       tokenizeIdentifier s
     else if c = '\'' then
       tokenizeStringLit s
-    else if c = '(' then
-      .ok .LeftParen (s.advance)
-    else if c = ')' then
-      .ok .RightParen (s.advance)
-    else if c = ',' then
-      .ok .Comma (s.advance)
-    else if c = ';' then
-      .ok .Semicolon (s.advance)
-    else if c = '*' then
-      .ok .Star (s.advance)
-    else if c = '.' then
-      .ok .Dot (s.advance)
-    else if c = '=' then
-      .ok (.Operator .Equals) (s.advance)
-    else if c = '<' then
-      let s' := s.advance
-      match s'.peek with
-      | some '=' => .ok (.Operator .LessOrEqual) (s'.advance)
-      | some '>' => .ok (.Operator .NotEquals) (s'.advance)
-      | _ => .ok (.Operator .LessThan) s'
-    else if c = '>' then
-      let s' := s.advance
-      match s'.peek with
-      | some '=' => .ok (.Operator .GreaterOrEqual) (s'.advance)
-      | _ => .ok (.Operator .GreaterThan) s'
-    else if c = '!' then
-      let s' := s.advance
-      match s'.peek with
-      | some '=' => .ok (.Operator .NotEquals) (s'.advance)
-      | _ => .error s!"Unexpected character: {c}" s
-    else if c = '+' then
-      .ok (.Operator .Plus) (s.advance)
-    else if c = '-' then
-      .ok (.Operator .Minus) (s.advance)
-    else if c = '/' then
-      .ok (.Operator .Divide) (s.advance)
     else
-      .error s!"Unexpected character: {c}" s
+      -- Check simple single-char tokens first
+      match simpleTokenTable.find? (·.1 == c) with
+      | some (_, tok) => .ok tok (s.advance)
+      | none =>
+        -- Handle multi-char operators
+        if c = '<' then
+          let s' := s.advance
+          match s'.peek with
+          | some '=' => .ok (.Operator .LessOrEqual) (s'.advance)
+          | some '>' => .ok (.Operator .NotEquals) (s'.advance)
+          | _ => .ok (.Operator .LessThan) s'
+        else if c = '>' then
+          let s' := s.advance
+          match s'.peek with
+          | some '=' => .ok (.Operator .GreaterOrEqual) (s'.advance)
+          | _ => .ok (.Operator .GreaterThan) s'
+        else if c = '!' then
+          let s' := s.advance
+          match s'.peek with
+          | some '=' => .ok (.Operator .NotEquals) (s'.advance)
+          | _ => .error s!"Unexpected character: {c}" s
+        else
+          .error s!"Unexpected character: {c}" s
 
 -- Tokenize entire input
 partial def tokenize (s : LexerState) : LexerResult (List Token) :=
