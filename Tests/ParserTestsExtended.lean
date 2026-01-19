@@ -32,11 +32,92 @@ def testSelectTableAlias : IO Unit := do
       | _ => 
           IO.println s!"FAIL: testSelectTableAlias - Unexpected parse result: {repr stmt}"
 
--- Note: ORDER BY, LIMIT, and OFFSET parsing are not yet implemented
--- These tests are commented out until these features are added to the parser
--- def testSelectOrderBy : IO Unit := do ...
--- def testSelectLimit : IO Unit := do ...
--- def testSelectLimitOffset : IO Unit := do ...
+-- Test SELECT with ORDER BY
+def testSelectOrderBy : IO Unit := do
+  match parseSQL "SELECT * FROM users ORDER BY name" with
+  | Sum.inl err =>
+      IO.println s!"FAIL: testSelectOrderBy - {err}"
+  | Sum.inr stmt =>
+      match stmt with
+      | Statement.Select _ _ _ orderBy _ _ =>
+          if orderBy.length == 1 then
+            IO.println "PASS: testSelectOrderBy"
+          else
+            IO.println s!"FAIL: testSelectOrderBy - Expected 1 ORDER BY item, got {orderBy.length}"
+      | _ =>
+          IO.println s!"FAIL: testSelectOrderBy - Unexpected parse result: {repr stmt}"
+
+-- Test SELECT with ORDER BY DESC
+def testSelectOrderByDesc : IO Unit := do
+  match parseSQL "SELECT * FROM users ORDER BY age DESC" with
+  | Sum.inl err =>
+      IO.println s!"FAIL: testSelectOrderByDesc - {err}"
+  | Sum.inr stmt =>
+      match stmt with
+      | Statement.Select _ _ _ [(_, false)] _ _ =>
+          IO.println "PASS: testSelectOrderByDesc"
+      | Statement.Select _ _ _ orderBy _ _ =>
+          IO.println s!"FAIL: testSelectOrderByDesc - Expected DESC (false), got {repr orderBy}"
+      | _ =>
+          IO.println s!"FAIL: testSelectOrderByDesc - Unexpected parse result: {repr stmt}"
+
+-- Test SELECT with ORDER BY multiple columns
+def testSelectOrderByMultiple : IO Unit := do
+  match parseSQL "SELECT * FROM users ORDER BY name ASC, age DESC" with
+  | Sum.inl err =>
+      IO.println s!"FAIL: testSelectOrderByMultiple - {err}"
+  | Sum.inr stmt =>
+      match stmt with
+      | Statement.Select _ _ _ orderBy _ _ =>
+          if orderBy.length == 2 then
+            IO.println "PASS: testSelectOrderByMultiple"
+          else
+            IO.println s!"FAIL: testSelectOrderByMultiple - Expected 2 ORDER BY items, got {orderBy.length}"
+      | _ =>
+          IO.println s!"FAIL: testSelectOrderByMultiple - Unexpected parse result: {repr stmt}"
+
+-- Test SELECT with LIMIT
+def testSelectLimit : IO Unit := do
+  match parseSQL "SELECT * FROM users LIMIT 10" with
+  | Sum.inl err =>
+      IO.println s!"FAIL: testSelectLimit - {err}"
+  | Sum.inr stmt =>
+      match stmt with
+      | Statement.Select _ _ _ _ (some 10) _ =>
+          IO.println "PASS: testSelectLimit"
+      | Statement.Select _ _ _ _ limit _ =>
+          IO.println s!"FAIL: testSelectLimit - Expected LIMIT 10, got {repr limit}"
+      | _ =>
+          IO.println s!"FAIL: testSelectLimit - Unexpected parse result: {repr stmt}"
+
+-- Test SELECT with LIMIT and OFFSET
+def testSelectLimitOffset : IO Unit := do
+  match parseSQL "SELECT * FROM users LIMIT 10 OFFSET 20" with
+  | Sum.inl err =>
+      IO.println s!"FAIL: testSelectLimitOffset - {err}"
+  | Sum.inr stmt =>
+      match stmt with
+      | Statement.Select _ _ _ _ (some 10) (some 20) =>
+          IO.println "PASS: testSelectLimitOffset"
+      | Statement.Select _ _ _ _ limit offset =>
+          IO.println s!"FAIL: testSelectLimitOffset - Expected LIMIT 10 OFFSET 20, got limit={repr limit}, offset={repr offset}"
+      | _ =>
+          IO.println s!"FAIL: testSelectLimitOffset - Unexpected parse result: {repr stmt}"
+
+-- Test SELECT with WHERE, ORDER BY, LIMIT, OFFSET (full query)
+def testSelectFull : IO Unit := do
+  match parseSQL "SELECT name, age FROM users WHERE active = 1 ORDER BY name LIMIT 10 OFFSET 5" with
+  | Sum.inl err =>
+      IO.println s!"FAIL: testSelectFull - {err}"
+  | Sum.inr stmt =>
+      match stmt with
+      | Statement.Select cols (some _) (some _) orderBy (some 10) (some 5) =>
+          if cols.length == 2 && orderBy.length == 1 then
+            IO.println "PASS: testSelectFull"
+          else
+            IO.println s!"FAIL: testSelectFull - Wrong counts: cols={cols.length}, orderBy={orderBy.length}"
+      | _ =>
+          IO.println s!"FAIL: testSelectFull - Unexpected parse result: {repr stmt}"
 
 -- Test SELECT with complex WHERE (multiple ANDs)
 def testComplexWhere : IO Unit := do
@@ -233,10 +314,6 @@ def testMixedCaseKeywords : IO Unit := do
       | _ => 
           IO.println s!"FAIL: testMixedCaseKeywords - Unexpected parse result: {repr stmt}"
 
--- Note: ORDER BY parsing is not yet implemented
--- These tests are commented out until this feature is added to the parser
--- def testOrderByDesc : IO Unit := do ...
--- def testOrderByMultiple : IO Unit := do ...
 
 -- Test empty SQL (error case)
 def testEmptySQL : IO Unit := do
@@ -283,7 +360,12 @@ def runExtendedParserTests : IO Unit := do
   IO.println "=== Running Extended Parser Tests ==="
   testSelectWithAlias
   testSelectTableAlias
-  -- ORDER BY, LIMIT, OFFSET not yet implemented
+  testSelectOrderBy
+  testSelectOrderByDesc
+  testSelectOrderByMultiple
+  testSelectLimit
+  testSelectLimitOffset
+  testSelectFull
   testComplexWhere
   testWhereOr
   testWhereNot
@@ -299,7 +381,6 @@ def runExtendedParserTests : IO Unit := do
   testArithmeticInSelect
   testParserAllComparisonOperators
   testMixedCaseKeywords
-  -- ORDER BY not yet implemented
   testEmptySQL
   testMissingSelectColumns
   testMissingWhereExpression

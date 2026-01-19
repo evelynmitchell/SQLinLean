@@ -33,6 +33,8 @@ inductive Keyword where
   | HAVING
   | LIMIT
   | OFFSET
+  | ASC
+  | DESC
   deriving Repr, BEq, DecidableEq, Nonempty
 
 -- SQL Operators
@@ -107,6 +109,8 @@ def Keyword.toString : Keyword → String
   | .HAVING => "HAVING"
   | .LIMIT => "LIMIT"
   | .OFFSET => "OFFSET"
+  | .ASC => "ASC"
+  | .DESC => "DESC"
 
 def Keyword.fromString? (s : String) : Option Keyword :=
   match s.toUpper with
@@ -140,6 +144,8 @@ def Keyword.fromString? (s : String) : Option Keyword :=
   | "HAVING" => some .HAVING
   | "LIMIT" => some .LIMIT
   | "OFFSET" => some .OFFSET
+  | "ASC" => some .ASC
+  | "DESC" => some .DESC
   | _ => none
 
 end SQLinLean
