@@ -25,7 +25,7 @@ All previously documented bugs have been fixed:
 Based on ROADMAP.md Phase 1 and expected corpus failures:
 
 ### High Priority (Common in Real Queries)
-- [ ] JOIN parsing (INNER, LEFT, RIGHT, OUTER) - AST exists
+- [x] JOIN parsing (INNER, LEFT, RIGHT, FULL OUTER)
 - [x] ORDER BY parsing (PR #29)
 - [x] LIMIT/OFFSET parsing (PR #29)
 - [ ] Aggregate functions (COUNT, SUM, AVG, MIN, MAX)
