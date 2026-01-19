@@ -89,97 +89,26 @@ inductive Token where
   | EOF
   deriving Repr, BEq, Nonempty
 
--- Helper functions
-def Keyword.toString : Keyword → String
-  | .SELECT => "SELECT"
-  | .FROM => "FROM"
-  | .WHERE => "WHERE"
-  | .INSERT => "INSERT"
-  | .INTO => "INTO"
-  | .VALUES => "VALUES"
-  | .UPDATE => "UPDATE"
-  | .SET => "SET"
-  | .DELETE => "DELETE"
-  | .CREATE => "CREATE"
-  | .TABLE => "TABLE"
-  | .DROP => "DROP"
-  | .ALTER => "ALTER"
-  | .AND => "AND"
-  | .OR => "OR"
-  | .NOT => "NOT"
-  | .NULL => "NULL"
-  | .AS => "AS"
-  | .JOIN => "JOIN"
-  | .LEFT => "LEFT"
-  | .RIGHT => "RIGHT"
-  | .INNER => "INNER"
-  | .OUTER => "OUTER"
-  | .FULL => "FULL"
-  | .ON => "ON"
-  | .ORDER => "ORDER"
-  | .BY => "BY"
-  | .GROUP => "GROUP"
-  | .HAVING => "HAVING"
-  | .LIMIT => "LIMIT"
-  | .OFFSET => "OFFSET"
-  | .ASC => "ASC"
-  | .DESC => "DESC"
-  | .COUNT => "COUNT"
-  | .SUM => "SUM"
-  | .AVG => "AVG"
-  | .MIN => "MIN"
-  | .MAX => "MAX"
-  | .DISTINCT => "DISTINCT"
-  | .IS => "IS"
-  | .LIKE => "LIKE"
-  | .IN => "IN"
-  | .BETWEEN => "BETWEEN"
+-- Single source of truth: keyword string mappings
+private def keywordTable : List (String × Keyword) :=
+  [("SELECT", .SELECT), ("FROM", .FROM), ("WHERE", .WHERE), ("INSERT", .INSERT),
+   ("INTO", .INTO), ("VALUES", .VALUES), ("UPDATE", .UPDATE), ("SET", .SET),
+   ("DELETE", .DELETE), ("CREATE", .CREATE), ("TABLE", .TABLE), ("DROP", .DROP),
+   ("ALTER", .ALTER), ("AND", .AND), ("OR", .OR), ("NOT", .NOT), ("NULL", .NULL),
+   ("AS", .AS), ("JOIN", .JOIN), ("LEFT", .LEFT), ("RIGHT", .RIGHT),
+   ("INNER", .INNER), ("OUTER", .OUTER), ("FULL", .FULL), ("ON", .ON),
+   ("ORDER", .ORDER), ("BY", .BY), ("GROUP", .GROUP), ("HAVING", .HAVING),
+   ("LIMIT", .LIMIT), ("OFFSET", .OFFSET), ("ASC", .ASC), ("DESC", .DESC),
+   ("COUNT", .COUNT), ("SUM", .SUM), ("AVG", .AVG), ("MIN", .MIN), ("MAX", .MAX),
+   ("DISTINCT", .DISTINCT), ("IS", .IS), ("LIKE", .LIKE), ("IN", .IN),
+   ("BETWEEN", .BETWEEN)]
+
+def Keyword.toString (kw : Keyword) : String :=
+  match keywordTable.find? (·.2 == kw) with
+  | some (s, _) => s
+  | none => "" -- unreachable for valid keywords
 
 def Keyword.fromString? (s : String) : Option Keyword :=
-  match s.toUpper with
-  | "SELECT" => some .SELECT
-  | "FROM" => some .FROM
-  | "WHERE" => some .WHERE
-  | "INSERT" => some .INSERT
-  | "INTO" => some .INTO
-  | "VALUES" => some .VALUES
-  | "UPDATE" => some .UPDATE
-  | "SET" => some .SET
-  | "DELETE" => some .DELETE
-  | "CREATE" => some .CREATE
-  | "TABLE" => some .TABLE
-  | "DROP" => some .DROP
-  | "ALTER" => some .ALTER
-  | "AND" => some .AND
-  | "OR" => some .OR
-  | "NOT" => some .NOT
-  | "NULL" => some .NULL
-  | "AS" => some .AS
-  | "JOIN" => some .JOIN
-  | "LEFT" => some .LEFT
-  | "RIGHT" => some .RIGHT
-  | "INNER" => some .INNER
-  | "OUTER" => some .OUTER
-  | "FULL" => some .FULL
-  | "ON" => some .ON
-  | "ORDER" => some .ORDER
-  | "BY" => some .BY
-  | "GROUP" => some .GROUP
-  | "HAVING" => some .HAVING
-  | "LIMIT" => some .LIMIT
-  | "OFFSET" => some .OFFSET
-  | "ASC" => some .ASC
-  | "DESC" => some .DESC
-  | "COUNT" => some .COUNT
-  | "SUM" => some .SUM
-  | "AVG" => some .AVG
-  | "MIN" => some .MIN
-  | "MAX" => some .MAX
-  | "DISTINCT" => some .DISTINCT
-  | "IS" => some .IS
-  | "LIKE" => some .LIKE
-  | "IN" => some .IN
-  | "BETWEEN" => some .BETWEEN
-  | _ => none
+  keywordTable.find? (·.1 == s.toUpper) |>.map (·.2)
 
 end SQLinLean

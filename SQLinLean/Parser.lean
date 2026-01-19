@@ -356,6 +356,17 @@ def parseTableRefSimple (s : ParserState) : ParserResult TableRef :=
       | _ => (none, s')
     .ok (TableRef.Table tableName tableAlias) s''
 
+-- Try to parse [OUTER] JOIN after a join direction keyword, returning state after JOIN
+private def tryParseOuterJoin (s : ParserState) (original : ParserState) : Option ParserState :=
+  match s.peek with
+  | some (.Keyword .OUTER) =>
+    let s' := s.advance
+    match s'.peek with
+    | some (.Keyword .JOIN) => some s'.advance
+    | _ => none
+  | some (.Keyword .JOIN) => some s.advance
+  | _ => none
+
 -- Try to parse a join type keyword sequence
 -- Returns (some joinType, state after JOIN keyword) or (none, original state)
 def tryParseJoinType (s : ParserState) : Option JoinType × ParserState :=
@@ -366,35 +377,17 @@ def tryParseJoinType (s : ParserState) : Option JoinType × ParserState :=
     | some (.Keyword .JOIN) => (some .Inner, s'.advance)
     | _ => (none, s)
   | some (.Keyword .LEFT) =>
-    let s' := s.advance
-    match s'.peek with
-    | some (.Keyword .OUTER) =>
-      let s'' := s'.advance
-      match s''.peek with
-      | some (.Keyword .JOIN) => (some .Left, s''.advance)
-      | _ => (none, s)
-    | some (.Keyword .JOIN) => (some .Left, s'.advance)
-    | _ => (none, s)
+    match tryParseOuterJoin s.advance s with
+    | some s' => (some .Left, s')
+    | none => (none, s)
   | some (.Keyword .RIGHT) =>
-    let s' := s.advance
-    match s'.peek with
-    | some (.Keyword .OUTER) =>
-      let s'' := s'.advance
-      match s''.peek with
-      | some (.Keyword .JOIN) => (some .Right, s''.advance)
-      | _ => (none, s)
-    | some (.Keyword .JOIN) => (some .Right, s'.advance)
-    | _ => (none, s)
+    match tryParseOuterJoin s.advance s with
+    | some s' => (some .Right, s')
+    | none => (none, s)
   | some (.Keyword .FULL) =>
-    let s' := s.advance
-    match s'.peek with
-    | some (.Keyword .OUTER) =>
-      let s'' := s'.advance
-      match s''.peek with
-      | some (.Keyword .JOIN) => (some .Full, s''.advance)
-      | _ => (none, s)
-    | some (.Keyword .JOIN) => (some .Full, s'.advance)
-    | _ => (none, s)
+    match tryParseOuterJoin s.advance s with
+    | some s' => (some .Full, s')
+    | none => (none, s)
   | some (.Keyword .JOIN) => (some .Inner, s.advance)  -- Plain JOIN = INNER JOIN
   | _ => (none, s)
 
