@@ -99,12 +99,12 @@ def tokenizeNumber (s : LexerState) : LexerResult Token :=
     | some i => .ok (.Literal (.Integer i)) newState
     | none => .error "Invalid integer literal" newState
 
--- Tokenize a string literal (single-quoted) - helper function (optimized)
-partial def readStringContent (acc : List Char) (state : LexerState) : LexerResult Token :=
+-- Tokenize a string literal - helper function (parameterized by quote char)
+partial def readStringContent (quoteChar : Char) (acc : List Char) (state : LexerState) : LexerResult Token :=
   match state.peek with
   | none => .error "Unterminated string literal" state
   | some c =>
-    if c = '\'' then
+    if c = quoteChar then
       .ok (.Literal (.String (String.ofList acc.reverse))) (state.advance)
     else if c = '\\' then
       -- Handle common escape sequences
@@ -122,14 +122,14 @@ partial def readStringContent (acc : List Char) (state : LexerState) : LexerResu
           | '\'' => '\''
           | '"'  => '"'
           | c    => c
-        readStringContent (escaped :: acc) (state.advance)
+        readStringContent quoteChar (escaped :: acc) (state.advance)
     else
-      readStringContent (c :: acc) (state.advance)
+      readStringContent quoteChar (c :: acc) (state.advance)
 
--- Tokenize a string literal (single-quoted)
-def tokenizeStringLit (s : LexerState) : LexerResult Token :=
+-- Tokenize a string literal (single or double-quoted)
+def tokenizeStringLit (quoteChar : Char) (s : LexerState) : LexerResult Token :=
   -- Skip opening quote
-  readStringContent [] (s.advance)
+  readStringContent quoteChar [] (s.advance)
 
 -- Tokenize an identifier or keyword
 def tokenizeIdentifier (s : LexerState) : LexerResult Token :=
@@ -158,8 +158,8 @@ def tokenizeOne (s : LexerState) : LexerResult Token :=
       tokenizeNumber s
     else if isAlpha c || c = '_' then
       tokenizeIdentifier s
-    else if c = '\'' then
-      tokenizeStringLit s
+    else if c = '\'' || c = '"' then
+      tokenizeStringLit c s
     else
       -- Check simple single-char tokens first
       match simpleTokenTable.find? (·.1 == c) with

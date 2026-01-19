@@ -8,9 +8,23 @@ Prioritized task list for the project.
 - [x] Merge PR #18 (Codespace setup + Claude skills) ✓
 - [x] Merge PR #25 (Use case docs + testing infrastructure) ✓
 - [x] Merge PR #29 (ORDER BY, LIMIT, OFFSET parsing) ✓
-- [ ] Download Spider dataset: `./scripts/download-spider.sh`
-- [ ] Run baseline parser test: `./scripts/test-corpus.sh spider`
-- [ ] Document current parse success rate
+- [x] Download Spider dataset ✓
+- [x] Run baseline parser test ✓
+- [x] Document current parse success rate ✓
+
+## Spider Corpus Results (2026-01-19)
+
+**Success Rate: 100%** (500/500 queries)
+
+| Fix | Success Rate |
+|-----|--------------|
+| Baseline | 76.2% |
+| + Double-quoted strings | 93.4% |
+| + Subqueries | 99.4% |
+| + Multi-JOIN syntax | **100.0%** |
+
+See: `tests/data/results/spider-100-percent-2026-01-19.md`
+Run: `uv run scripts/test-spider.py --categorize`
 
 ## Known Bugs (Parser)
 
@@ -30,7 +44,8 @@ Based on ROADMAP.md Phase 1 and expected corpus failures:
 - [x] LIMIT/OFFSET parsing (PR #29)
 - [x] Aggregate functions (COUNT, SUM, AVG, MIN, MAX) (PR #31)
 - [x] GROUP BY / HAVING
-2 
+- [x] **Double-quoted strings** - Fixed: 76.2% → 93.4%
+
 ### Medium Priority
 - [ ] UPDATE statement parser - AST exists
 - [ ] CREATE TABLE parser - AST exists
@@ -41,16 +56,16 @@ Based on ROADMAP.md Phase 1 and expected corpus failures:
 - [x] IS NULL / IS NOT NULL
 
 ### Lower Priority
-- [ ] Subqueries
+- [x] Subqueries - 93.4% → 99.4%
 - [ ] CASE expressions
 - [ ] UNION / INTERSECT / EXCEPT
 - [ ] Window functions
 
 ## Testing & Validation
 
-- [ ] Measure Spider corpus success rate (Issue #28)
+- [x] Measure Spider corpus success rate (76.2% baseline)
 - [ ] Measure WikiSQL corpus success rate
-- [ ] Categorize failures by feature
+- [x] Categorize failures by feature
 - [ ] Add round-trip property test (parse → print → parse)
 - [ ] Set up CI to run subset of corpus tests
 
