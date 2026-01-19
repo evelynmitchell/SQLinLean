@@ -3,7 +3,7 @@
 # Codespace Setup Script
 # Sets up a new GitHub Codespace with all required tools and dependencies
 #
-# Usage: ./setup_codespace.sh
+# Usage: ./setup_codespaces.sh
 
 # Verify we're running in bash
 if [ -z "$BASH_VERSION" ]; then
