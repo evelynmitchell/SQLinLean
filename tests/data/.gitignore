@@ -1,0 +1,18 @@
+# Ignore downloaded datasets (large files)
+# Keep .gitkeep and README files
+
+spider/*
+!spider/.gitkeep
+
+wikisql/*
+!wikisql/.gitkeep
+
+github-samples/*
+!github-samples/.gitkeep
+
+# Keep custom test cases
+# custom/
+
+# Ignore results (regenerated)
+results/*
+!results/.gitkeep
