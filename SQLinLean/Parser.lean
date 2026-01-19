@@ -383,19 +383,47 @@ def parseOffset (s : ParserState) : ParserResult (Option Nat) :=
     | .ok n s'' => .ok (some n) s''
   | _ => .ok none s
 
--- Helper to parse the trailing clauses (ORDER BY, LIMIT, OFFSET) after WHERE
+-- Parse GROUP BY clause: GROUP BY expr [, ...]
+partial def parseGroupBy (s : ParserState) : ParserResult (List Expr) :=
+  match s.peek with
+  | some (.Keyword .GROUP) =>
+    let s' := s.advance
+    match s'.peek with
+    | some (.Keyword .BY) =>
+      let s'' := s'.advance
+      parseList parseExpr s''
+    | _ => .error "Expected BY after GROUP" s'
+  | _ => .ok [] s  -- No GROUP BY clause
+
+-- Parse HAVING clause: HAVING expr
+def parseHaving (s : ParserState) : ParserResult (Option Expr) :=
+  match s.peek with
+  | some (.Keyword .HAVING) =>
+    let s' := s.advance
+    match parseExpr s' with
+    | .error msg state => .error msg state
+    | .ok expr s'' => .ok (some expr) s''
+  | _ => .ok none s  -- No HAVING clause
+
+-- Helper to parse the trailing clauses (GROUP BY, HAVING, ORDER BY, LIMIT, OFFSET) after WHERE
 def parseSelectTrailing (columns : List SelectItem) (fromTable : Option TableRef)
     (whereClause : Option Expr) (s : ParserState) : ParserResult Statement :=
-  match parseOrderBy s with
+  match parseGroupBy s with
   | .error msg state => .error msg state
-  | .ok orderBy s' =>
-    match parseLimit s' with
+  | .ok groupBy s' =>
+    match parseHaving s' with
     | .error msg state => .error msg state
-    | .ok limit s'' =>
-      match parseOffset s'' with
+    | .ok having s'' =>
+      match parseOrderBy s'' with
       | .error msg state => .error msg state
-      | .ok offset s''' =>
-        .ok (.Select columns fromTable whereClause orderBy limit offset) s'''
+      | .ok orderBy s''' =>
+        match parseLimit s''' with
+        | .error msg state => .error msg state
+        | .ok limit s'''' =>
+          match parseOffset s'''' with
+          | .error msg state => .error msg state
+          | .ok offset s''''' =>
+            .ok (.Select columns fromTable whereClause groupBy having orderBy limit offset) s'''''
 
 -- Parse SELECT statement
 def parseSelect (s : ParserState) : ParserResult Statement :=

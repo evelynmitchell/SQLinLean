@@ -14,7 +14,7 @@ def testSimpleSelect : IO Unit := do
       IO.println s!"FAIL: testSimpleSelect - {err}"
   | Sum.inr stmt =>
       match stmt with
-      | Statement.Select [SelectItem.AllColumns] (some (TableRef.Table "users" none)) none [] none none =>
+      | Statement.Select [SelectItem.AllColumns] (some (TableRef.Table "users" none)) none [] none [] none none =>
           IO.println "PASS: testSimpleSelect"
       | _ => 
           IO.println s!"FAIL: testSimpleSelect - Unexpected parse result: {repr stmt}"
@@ -26,7 +26,7 @@ def testSelectColumns : IO Unit := do
       IO.println s!"FAIL: testSelectColumns - {err}"
   | Sum.inr stmt =>
       match stmt with
-      | Statement.Select cols (some (TableRef.Table "users" none)) none [] none none =>
+      | Statement.Select cols (some (TableRef.Table "users" none)) none [] none [] none none =>
           match cols with
           | [SelectItem.Expr (Expr.Identifier "name") none, 
              SelectItem.Expr (Expr.Identifier "age") none] =>
@@ -43,7 +43,7 @@ def testSelectWhere : IO Unit := do
       IO.println s!"FAIL: testSelectWhere - {err}"
   | Sum.inr stmt =>
       match stmt with
-      | Statement.Select _ _ (some whereClause) _ _ _ =>
+      | Statement.Select _ _ (some whereClause) _ _ _ _ _ =>
           match whereClause with
           | Expr.BinaryOp (Expr.Identifier "age") Operator.GreaterThan (Expr.Literal (Literal.Integer 18)) =>
               IO.println "PASS: testSelectWhere"
@@ -87,7 +87,7 @@ def testQualifiedIdentifier : IO Unit := do
       IO.println s!"FAIL: testQualifiedIdentifier - {err}"
   | Sum.inr stmt =>
       match stmt with
-      | Statement.Select [SelectItem.Expr (Expr.QualifiedIdentifier "users" "name") none] _ _ _ _ _ =>
+      | Statement.Select [SelectItem.Expr (Expr.QualifiedIdentifier "users" "name") none] _ _ _ _ _ _ _ =>
           IO.println "PASS: testQualifiedIdentifier"
       | _ => 
           IO.println s!"FAIL: testQualifiedIdentifier - Unexpected parse result: {repr stmt}"
@@ -99,7 +99,7 @@ def testMultipleWhere : IO Unit := do
       IO.println s!"FAIL: testMultipleWhere - {err}"
   | Sum.inr stmt =>
       match stmt with
-      | Statement.Select _ _ (some _) _ _ _ =>
+      | Statement.Select _ _ (some _) _ _ _ _ _ =>
           IO.println "PASS: testMultipleWhere"
       | _ => 
           IO.println s!"FAIL: testMultipleWhere - Unexpected parse result: {repr stmt}"
@@ -143,7 +143,7 @@ def testArithmetic : IO Unit := do
       IO.println s!"FAIL: testArithmetic - {err}"
   | Sum.inr stmt =>
       match stmt with
-      | Statement.Select _ _ (some _) _ _ _ =>
+      | Statement.Select _ _ (some _) _ _ _ _ _ =>
           IO.println "PASS: testArithmetic"
       | _ => 
           IO.println s!"FAIL: testArithmetic - Unexpected parse result: {repr stmt}"
@@ -155,7 +155,7 @@ def testArithmeticPrecedence : IO Unit := do
       IO.println s!"FAIL: testArithmeticPrecedence - {err}"
   | Sum.inr stmt =>
       match stmt with
-      | Statement.Select _ _ (some _) _ _ _ =>
+      | Statement.Select _ _ (some _) _ _ _ _ _ =>
           IO.println "PASS: testArithmeticPrecedence"
       | _ => 
           IO.println s!"FAIL: testArithmeticPrecedence - Unexpected parse result: {repr stmt}"

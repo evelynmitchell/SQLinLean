@@ -50,6 +50,8 @@ inductive Statement where
       (columns : List SelectItem)
       (fromTable : Option TableRef)
       (whereClause : Option Expr)
+      (groupBy : List Expr)           -- GROUP BY expressions
+      (having : Option Expr)          -- HAVING condition
       (orderBy : List (Expr × Bool))  -- (expression, isAscending)
       (limit : Option Nat)
       (offset : Option Nat)
