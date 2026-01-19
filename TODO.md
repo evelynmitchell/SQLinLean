@@ -30,7 +30,7 @@ Based on ROADMAP.md Phase 1 and expected corpus failures:
 - [x] LIMIT/OFFSET parsing (PR #29)
 - [x] Aggregate functions (COUNT, SUM, AVG, MIN, MAX) (PR #31)
 - [x] GROUP BY / HAVING
-
+2 
 ### Medium Priority
 - [ ] UPDATE statement parser - AST exists
 - [ ] CREATE TABLE parser - AST exists
