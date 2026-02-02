@@ -50,7 +50,8 @@ def categorize_failure(query: str) -> str:
         return 'CASE/WHEN'
     if ' || ' in q:
         return 'String concat (||)'
-    if '""' in q or query.count('"') >= 2:
+    # Check for problematic double-quote usage: empty quotes or unbalanced quotes
+    if '""' in query or (query.count('"') % 2 != 0):
         return 'Double-quoted strings'
 
     return 'Other'
