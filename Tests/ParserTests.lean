@@ -57,6 +57,27 @@ def testArithmeticPrecedence : IO Unit :=
     | .Select _ _ _ (some _) _ _ _ _ _ => true
     | _ => false
 
+-- Subquery tests
+def testScalarSubquery : IO Unit :=
+  parseTest "testScalarSubquery" "SELECT (SELECT MAX(age) FROM users) AS max_age" fun
+    | .Select _ [.Expr (.Subquery _) (some "max_age")] none _ _ _ _ _ _ => true
+    | _ => false
+
+def testInSubquery : IO Unit :=
+  parseTest "testInSubquery" "SELECT * FROM users WHERE id IN (SELECT user_id FROM orders)" fun
+    | .Select _ _ _ (some (.InSubquery (.Identifier "id") _ false)) _ _ _ _ _ => true
+    | _ => false
+
+def testNotInSubquery : IO Unit :=
+  parseTest "testNotInSubquery" "SELECT * FROM users WHERE id NOT IN (SELECT banned_id FROM banned)" fun
+    | .Select _ _ _ (some (.InSubquery (.Identifier "id") _ true)) _ _ _ _ _ => true
+    | _ => false
+
+def testNestedSubquery : IO Unit :=
+  parseTest "testNestedSubquery" "SELECT * FROM users WHERE age > (SELECT AVG(age) FROM users)" fun
+    | .Select _ _ _ (some (.BinaryOp (.Identifier "age") .GreaterThan (.Subquery _))) _ _ _ _ _ => true
+    | _ => false
+
 -- Run all parser tests
 def runParserTests : IO Unit := do
   IO.println "=== Running Parser Tests ==="
@@ -73,6 +94,11 @@ def runParserTests : IO Unit := do
   testMalformedInsert
   testArithmetic
   testArithmeticPrecedence
+  -- Subquery tests
+  testScalarSubquery
+  testInSubquery
+  testNotInSubquery
+  testNestedSubquery
   IO.println ""
 
 end SQLinLean.Tests.Parser

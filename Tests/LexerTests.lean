@@ -28,6 +28,14 @@ def testStrings : IO Unit :=
   lexTest "testStrings" "'hello' 'world'"
     [.Literal (.String "hello"), .Literal (.String "world"), .EOF]
 
+def testDoubleQuotedStrings : IO Unit :=
+  lexTest "testDoubleQuotedStrings" "\"hello\" \"world\""
+    [.Literal (.String "hello"), .Literal (.String "world"), .EOF]
+
+def testMixedQuoteStrings : IO Unit :=
+  lexTest "testMixedQuoteStrings" "'single' \"double\""
+    [.Literal (.String "single"), .Literal (.String "double"), .EOF]
+
 def testOperators : IO Unit :=
   lexTest "testOperators" "= != < > <= >= + - * /"
     [.Operator .Equals, .Operator .NotEquals, .Operator .LessThan, .Operator .GreaterThan,
@@ -51,6 +59,8 @@ def runLexerTests : IO Unit := do
   testFloats
   testNegativeNumbers
   testStrings
+  testDoubleQuotedStrings
+  testMixedQuoteStrings
   testOperators
   testKeywords
   testCaseInsensitivity
